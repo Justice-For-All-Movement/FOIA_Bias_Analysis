@@ -2,6 +2,36 @@
 
 Documentation baseline: **2026-10-11**, corrected plan version **3**. Source/PR verification: **2026-10-11T20:39:09.617Z**. This is a dated evidence ledger, not a live service-status feed.
 
+## Implementation status — 2026-11-15T18:55Z (supersedes the older "next unit" lines below)
+
+Repository: `Justice-For-All-Movement/FOIA_Bias_Analysis` (transferred from `neophilism`; the registry identity was updated in #25 so the PR-registry contract matches `GITHUB_REPOSITORY`). Main after this work: `bba0d2e` plus this documentation PR. Every PR below passed `corpus-offline`, `source-integrity` and `pr-registry-contract` on its exact head before merge.
+
+| Unit | PR(s) | Status |
+|---|---|---|
+| FBA-01 | #30 | Complete (earlier session). |
+| FBA-02 | #33 | Complete: `foia_bias/aggregator_contract.py` (consumer draft `fc13-consumer-draft-1`), `foia_bias/ledger.py` identity/provenance ledger, label invalidation audit, synthetic 15-record/3-partition export fixture + generator. |
+| FBA-03 | #34 | Complete: snapshot/config-bound cursors committed with the work, monotonic advance, corrupt-cursor repair, leases, legacy MuckRock checkpoints as non-resumable evidence. |
+| FBA-04 | #35 (contributing) | Consumer implemented against the consumer-draft contract (`main.py consume`). **Blocked for completion** on FOIA_Aggregator FC-13 (real export schema + producer commit) and FC-14. |
+| FBA-08 | #32 (contributing) | Transition-day bug fixed (2021-01-21 is Biden with `transition_months=6`; exact noon-ET intervals, independent transition flag, date-only inauguration day ambiguous, ongoing term excluded). Executive roster only; a complete *sourced* congressional roster remains. |
+| FBA-09 | #36 | Complete for orchestration: provider interface, deterministic fake, full-coverage chunking, strict validation, explicit failure states, injection flagging. Live provider accuracy unverified. |
+| FBA-10 | #36 (contributing) | Call ceiling → `budget_blocked`, no re-billing of committed labels. Concurrency/retry policy, billing ambiguity and live budgets remain. |
+| FBA-11, FBA-12 | #37 | Complete over fixtures: versioned cohorts with full exclusion census; standard-library logit/OLS with FE, CR1 cluster SE, diagnostics, exposure-normalized rates. |
+| FBA-05 | #37 (contributing) | Analytical duplicate-cluster policy only; legacy artifact reconciliation remains. |
+| FBA-06, 07, 13–16 | — | Not started. |
+
+**Aggregator dependency.** The consumer schema lives only in `foia_bias/aggregator_contract.py`. When FC-13 is published, align that module, regenerate `fixtures/export_v1` with `python scripts/make_export_fixture.py`, and pin the producer commit. Live manifests must carry a 40-hex `FOIA_Aggregator` commit; fixtures can never pass as live.
+
+**Tests.** `python -m unittest discover -s tests -v` → **101 tests**, all passing (CPython 3.12.14 in CI, 3.13 locally), plus `python scripts/validate_plan.py`, `node scripts/validate-pr-registry.mjs`, `python scripts/validate_e2eesa_status.py`.
+
+**Credentials/env vars for live use** (none exist; none are committed; nothing reads them yet except to fail closed):
+- `FOIA_BIAS_LLM_PROVIDER` (`disabled` default | `fake` | `openai` | `anthropic`): labeling provider selection. Live adapters are deliberately not implemented; selecting one raises `ProviderNotImplemented`.
+- `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`: model credential for a future live adapter.
+- `FOIA_BIAS_LLM_MODEL`: model identifier. `FOIA_BIAS_LLM_MAX_CALLS_PER_RUN`: required authorized call ceiling.
+- `FOIA_BIAS_LLM_FAKE_ALLOWED=1`: tests/fixtures only.
+- Read-only FOIA_Aggregator export access (location/credential to be defined by FC-13); Bias never receives archive write credentials.
+
+**Next ready.** FBA-06 (log/annual joins over the export contract), FBA-07 (text completeness/gap reports), FBA-10 completion, FBA-13 automated QA (fake provider already supports asymmetric bias injection), then FBA-05 legacy reconciliation. FBA-04/14 stay blocked on FC-13/FC-14. Research eligibility and certification remain **false**.
+
 Start with [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) and [registry/prs.json](../registry/prs.json). Run `python scripts/validate_plan.py` from repository root. Work IDs, dependencies, source requirements and related historical PRs are in the registry; completion mappings must remain separate from historical partial implementation.
 
 
