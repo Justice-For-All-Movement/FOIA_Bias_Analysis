@@ -4,7 +4,7 @@
   "roadmapVersion": 4,
   "planVerified": true,
   "plannedPrCount": 16,
-  "observedAt": "2026-11-15T18:54:53Z",
+  "observedAt": "2026-11-15T19:21:15Z",
   "planProvenance": {
     "baselineDate": "2026-10-11",
     "authority": "Current owner instruction to complete plans and registry integration; Engine-Room issue 71 recovered scope; repository evidence distinguished in plan; direct owner corrections October 11 2026: Aggregator full corpus is the analysis input; comparable completed periods exclude ongoing second Trump term",
@@ -141,7 +141,10 @@
       "id": "FBA-04",
       "title": "Full Aggregator corpus snapshot ingestion",
       "origin": "addition",
-      "prs": [],
+      "prs": [
+        35,
+        39
+      ],
       "scopeBasis": "2026-10-11 reconstructed completion package implementing inherited scope and direct owner BR-11/BR-12 architecture/period clarification; historical PRs are migration evidence",
       "requirementIds": [
         "BR-03",
@@ -157,16 +160,15 @@
       ],
       "priorEvidencePrs": [],
       "planPath": "docs/DEVELOPMENT_PLAN.md",
-      "planSection": "FBA-04",
-      "contributingPrs": [
-        35
-      ]
+      "planSection": "FBA-04"
     },
     {
       "id": "FBA-05",
       "title": "Shared-corpus deduplication and legacy artifact reconciliation",
       "origin": "addition",
-      "prs": [],
+      "prs": [
+        44
+      ],
       "scopeBasis": "2026-10-11 reconstructed completion package implementing inherited scope and direct owner BR-11/BR-12 architecture/period clarification; historical PRs are migration evidence",
       "requirementIds": [
         "BR-05",
@@ -212,7 +214,8 @@
       "planSection": "FBA-06",
       "contributingPrs": [
         2,
-        8
+        8,
+        41
       ]
     },
     {
@@ -239,7 +242,10 @@
         14
       ],
       "planPath": "docs/DEVELOPMENT_PLAN.md",
-      "planSection": "FBA-07"
+      "planSection": "FBA-07",
+      "contributingPrs": [
+        40
+      ]
     },
     {
       "id": "FBA-08",
@@ -304,7 +310,9 @@
       "id": "FBA-10",
       "title": "Resumable labeling, usage controls and full-corpus accounting",
       "origin": "addition",
-      "prs": [],
+      "prs": [
+        43
+      ],
       "scopeBasis": "2026-10-11 reconstructed completion package implementing inherited scope and direct owner BR-11/BR-12 architecture/period clarification; historical PRs are migration evidence",
       "requirementIds": [
         "BR-04",
@@ -386,7 +394,9 @@
       "id": "FBA-13",
       "title": "Automated annotation quality and robustness",
       "origin": "addition",
-      "prs": [],
+      "prs": [
+        42
+      ],
       "scopeBasis": "2026-10-11 reconstructed completion package implementing inherited scope and direct owner BR-11/BR-12 architecture/period clarification; historical PRs are migration evidence",
       "requirementIds": [
         "BR-01",
@@ -500,6 +510,111 @@
     }
   ],
   "pullRequests": [
+    {
+      "id": 5326247534,
+      "number": 44,
+      "title": "FBA-05: Analytical duplicate weights and legacy artifact reconciliation",
+      "url": "https://github.com/Justice-For-All-Movement/FOIA_Bias_Analysis/pull/44",
+      "state": "closed",
+      "draft": false,
+      "createdAt": "2026-11-15T19:20:18Z",
+      "updatedAt": "2026-11-15T19:21:13Z",
+      "closedAt": "2026-11-15T19:21:13Z",
+      "mergedAt": "2026-11-15T19:21:13Z",
+      "headSha": "3d03cfdeb43458215cd2b8467d02c07188e071a4",
+      "baseRef": "main",
+      "mergeCommitSha": "0b930109cb5d8417c96377c9dfdb560f0733e282"
+    },
+    {
+      "id": 5326226052,
+      "number": 43,
+      "title": "FBA-10: Resumable labeling jobs with usage controls and full census",
+      "url": "https://github.com/Justice-For-All-Movement/FOIA_Bias_Analysis/pull/43",
+      "state": "closed",
+      "draft": false,
+      "createdAt": "2026-11-15T19:18:07Z",
+      "updatedAt": "2026-11-15T19:19:54Z",
+      "closedAt": "2026-11-15T19:19:54Z",
+      "mergedAt": "2026-11-15T19:19:54Z",
+      "headSha": "975ecb1cb478dc34903e3b314a27c217eebf8cf1",
+      "baseRef": "main",
+      "mergeCommitSha": "8b182d20f9afbb3de1aedf6b2d2ed234666d40af"
+    },
+    {
+      "id": 5326200931,
+      "number": 42,
+      "title": "FBA-13: Automated annotation quality and robustness checks",
+      "url": "https://github.com/Justice-For-All-Movement/FOIA_Bias_Analysis/pull/42",
+      "state": "closed",
+      "draft": false,
+      "createdAt": "2026-11-15T19:15:32Z",
+      "updatedAt": "2026-11-15T19:17:08Z",
+      "closedAt": "2026-11-15T19:17:08Z",
+      "mergedAt": "2026-11-15T19:17:08Z",
+      "headSha": "cc7ff40622f97b490145984fc3387bc5b5234ebd",
+      "baseRef": "main",
+      "mergeCommitSha": "2135c80c098ea904dad1204fbc0de051f6c53a8d"
+    },
+    {
+      "id": 5326172291,
+      "number": 41,
+      "title": "FBA-06: Evidence-only request-log and annual context joins",
+      "url": "https://github.com/Justice-For-All-Movement/FOIA_Bias_Analysis/pull/41",
+      "state": "closed",
+      "draft": false,
+      "createdAt": "2026-11-15T19:12:41Z",
+      "updatedAt": "2026-11-15T19:14:36Z",
+      "closedAt": "2026-11-15T19:14:36Z",
+      "mergedAt": "2026-11-15T19:14:36Z",
+      "headSha": "453e0133e2bc75026869b588c9d9c0da143711c9",
+      "baseRef": "main",
+      "mergeCommitSha": "a9a68462f889013a9886c580c8ede95ff9fccb24"
+    },
+    {
+      "id": 5326142616,
+      "number": 40,
+      "title": "FBA-07: Text completeness validation and upstream gap report",
+      "url": "https://github.com/Justice-For-All-Movement/FOIA_Bias_Analysis/pull/40",
+      "state": "closed",
+      "draft": false,
+      "createdAt": "2026-11-15T19:09:38Z",
+      "updatedAt": "2026-11-15T19:11:49Z",
+      "closedAt": "2026-11-15T19:11:49Z",
+      "mergedAt": "2026-11-15T19:11:49Z",
+      "headSha": "52cfe68646c5a08eeaaa3239e2399f0d141bdda5",
+      "baseRef": "main",
+      "mergeCommitSha": "273b800eeffd49f3129bc8da14162e2314a10c86"
+    },
+    {
+      "id": 5326119847,
+      "number": 39,
+      "title": "FBA-04: Align consumer to merged FC-13 export contract (pinned ca822fa)",
+      "url": "https://github.com/Justice-For-All-Movement/FOIA_Bias_Analysis/pull/39",
+      "state": "closed",
+      "draft": false,
+      "createdAt": "2026-11-15T19:07:04Z",
+      "updatedAt": "2026-11-15T19:08:48Z",
+      "closedAt": "2026-11-15T19:08:48Z",
+      "mergedAt": "2026-11-15T19:08:48Z",
+      "headSha": "2cf5e0c54ccf703a4563894a5f7bf62ec85c9cbe",
+      "baseRef": "main",
+      "mergeCommitSha": "a00cc61c61dd2b66ebd4d43dad91d5683c75907e"
+    },
+    {
+      "id": 5326017695,
+      "number": 38,
+      "title": "Registry and handoff: map merged PRs #30-#37 to FBA units",
+      "url": "https://github.com/Justice-For-All-Movement/FOIA_Bias_Analysis/pull/38",
+      "state": "closed",
+      "draft": false,
+      "createdAt": "2026-11-15T18:55:25Z",
+      "updatedAt": "2026-11-15T18:57:18Z",
+      "closedAt": "2026-11-15T18:57:18Z",
+      "mergedAt": "2026-11-15T18:57:18Z",
+      "headSha": "114b439fae44ddfbb762ecf9e371bcba83812ad4",
+      "baseRef": "main",
+      "mergeCommitSha": "09237edfa6d93f50f839bddcde7ebbc1249c3b57"
+    },
     {
       "id": 5325992241,
       "number": 37,
