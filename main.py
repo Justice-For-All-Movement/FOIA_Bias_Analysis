@@ -26,7 +26,18 @@ def main(argv: list[str] | None = None) -> int:
             "--config", default="corpus-config.json",
             help="Read-only corpus JSON config; YAML requires optional PyYAML",
         )
+    consume = commands.add_parser(
+        "consume", help="Ingest a partitioned Aggregator export into the analysis ledger (resumable)")
+    consume.add_argument("--export", required=True, help="Directory containing manifest.json and partitions")
+    consume.add_argument("--ledger", required=True, help="Private analysis ledger path (created 0600)")
+    consume.add_argument("--batch-size", type=int, default=500)
+    consume.add_argument("--max-batches", type=int, default=None)
+    consume.add_argument("--job-id", default="consume")
+    consume.add_argument("--live", action="store_true",
+                         help="Expect a live FOIA_Aggregator export (default: synthetic fixture)")
     args = parser.parse_args(argv)
+    if args.command == "consume":
+        return _consume(args)
     try:
         from foia_bias.utils.corpus_config import load_config
         config = load_config(Path(args.config))
@@ -53,6 +64,20 @@ def main(argv: list[str] | None = None) -> int:
         summary = verify_snapshot(config, args.config)
     except (OSError, ValueError, RecursionError) as exc:
         print(f"Invalid corpus snapshot: {exc}", file=sys.stderr)
+        return 2
+    print(json.dumps(summary, sort_keys=True))
+    return 0
+
+
+def _consume(args) -> int:
+    try:
+        from foia_bias.consumer import consume
+        from foia_bias.ledger import AnalysisLedger
+        with AnalysisLedger(args.ledger) as ledger:
+            summary = consume(ledger, args.export, job_id=args.job_id, batch_size=args.batch_size,
+                              max_batches=args.max_batches, expected_fixture=not args.live)
+    except (OSError, ValueError, RuntimeError) as exc:
+        print(f"Export consumption failed: {exc}", file=sys.stderr)
         return 2
     print(json.dumps(summary, sort_keys=True))
     return 0

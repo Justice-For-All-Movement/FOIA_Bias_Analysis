@@ -108,6 +108,13 @@ class AnalysisLedger:
         self.conn = sqlite3.connect(str(self.path), timeout=30, isolation_level=None)
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA busy_timeout=30000")
+        try:
+            self._migrate()
+        except BaseException:
+            self.conn.close()
+            raise
+
+    def _migrate(self):
         with self.transaction() as conn:
             version = conn.execute("PRAGMA user_version").fetchone()[0]
             if not 0 <= version <= SCHEMA_VERSION:
