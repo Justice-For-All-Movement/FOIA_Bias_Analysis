@@ -21,8 +21,8 @@ from pathlib import Path
 
 from foia_bias import aggregator_contract as contract
 
-SCHEMA_VERSION = 1
-_SCHEMA = (
+SCHEMA_VERSION = 2
+_SCHEMA_V1 = (
     "CREATE TABLE schema_meta (version INTEGER NOT NULL)",
     """CREATE TABLE snapshots (
         snapshot_id TEXT PRIMARY KEY, contract_version TEXT NOT NULL, producer_name TEXT NOT NULL,
@@ -55,6 +55,19 @@ _SCHEMA = (
     "CREATE TRIGGER records_immutable BEFORE UPDATE ON records BEGIN SELECT RAISE(ABORT, 'snapshot records are immutable'); END",
     "CREATE TRIGGER invalidations_append_only BEFORE DELETE ON label_invalidations BEGIN SELECT RAISE(ABORT, 'append-only'); END",
 )
+# FBA-03 lossless consumer/labeling checkpoints.
+_SCHEMA_V2 = (
+    """CREATE TABLE consumer_cursors (
+        job_id TEXT PRIMARY KEY, snapshot_id TEXT NOT NULL REFERENCES snapshots(snapshot_id),
+        compatibility_sha256 TEXT NOT NULL, partition_index INTEGER NOT NULL, record_offset INTEGER NOT NULL,
+        records_committed INTEGER NOT NULL, status TEXT NOT NULL, updated_at TEXT NOT NULL)""",
+    """CREATE TABLE job_leases (
+        job_id TEXT PRIMARY KEY, owner TEXT NOT NULL, expires_at TEXT NOT NULL)""",
+    """CREATE TABLE legacy_artifacts (
+        path TEXT NOT NULL, sha256 TEXT NOT NULL, kind TEXT NOT NULL, detail_json TEXT NOT NULL,
+        recorded_at TEXT NOT NULL, PRIMARY KEY (path, sha256))""",
+)
+_MIGRATIONS = {1: _SCHEMA_V1, 2: _SCHEMA_V2}
 
 
 class LedgerError(RuntimeError):
@@ -97,13 +110,18 @@ class AnalysisLedger:
         self.conn.execute("PRAGMA busy_timeout=30000")
         with self.transaction() as conn:
             version = conn.execute("PRAGMA user_version").fetchone()[0]
-            if version == 0:
-                for statement in _SCHEMA:
-                    conn.execute(statement)
-                conn.execute("INSERT INTO schema_meta VALUES (?)", (SCHEMA_VERSION,))
-                conn.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
-            elif version != SCHEMA_VERSION:
+            if not 0 <= version <= SCHEMA_VERSION:
                 raise LedgerError("unsupported analysis ledger schema")
+            for step in range(version + 1, SCHEMA_VERSION + 1):
+                for statement in _MIGRATIONS[step]:
+                    conn.execute(statement)
+                if step == 1:
+                    conn.execute("INSERT INTO schema_meta VALUES (?)", (step,))
+                else:
+                    conn.execute("UPDATE schema_meta SET version=?", (step,))
+                conn.execute(f"PRAGMA user_version={step}")
+            if conn.execute("SELECT version FROM schema_meta").fetchone()[0] != SCHEMA_VERSION:
+                raise LedgerError("analysis ledger schema metadata mismatch")
 
     def close(self):
         self.conn.close()
