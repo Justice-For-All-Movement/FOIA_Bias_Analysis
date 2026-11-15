@@ -1,0 +1,44 @@
+{
+  "counts": {
+    "agencies": 6,
+    "archived": 12,
+    "metadata_only": 1,
+    "records": 13,
+    "sources": 9,
+    "text_indexed": 11
+  },
+  "excluded_fields": [
+    "storage_key",
+    "local_path",
+    "storage_backend",
+    "download_error",
+    "requester_name"
+  ],
+  "files": [
+    {
+      "path": "records-00001.jsonl",
+      "records": 5,
+      "sha256": "21d7a65318f09a59a5fa190c56dc13128a7daaba20d618e5ae10cc59dddcae6f"
+    },
+    {
+      "path": "records-00002.jsonl",
+      "records": 5,
+      "sha256": "77b7ddc73716708c9fd3d2eaab5d0035f3bfee02355300ef0172250ce5e8cb49"
+    },
+    {
+      "path": "records-00003.jsonl",
+      "records": 3,
+      "sha256": "40e2a87d2297d3857e7ce0cadd08a0342e3ed76ff83890bf1b86467f91622969"
+    }
+  ],
+  "generated_at": "2026-11-15T00:00:00+00:00",
+  "license": "SYNTHETIC FIXTURE - not FOIA_Aggregator data.",
+  "pagination": {
+    "default_page_size": 100,
+    "max_page_size": 500,
+    "order": "stable within a snapshot; cursors expire when the snapshot changes"
+  },
+  "schema": "/api/v1/export/schema",
+  "schema_version": "foia-catalog-export/1",
+  "snapshot_id": "snap_f0a329d417fe4d1529f2"
+}

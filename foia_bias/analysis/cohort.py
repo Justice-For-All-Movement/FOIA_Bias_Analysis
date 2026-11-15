@@ -39,7 +39,7 @@ class CohortConfig:
 
 
 def _clusters(records):
-    """Union-find over duplicate_of relations (redaction variants stay distinct)."""
+    """Union-find over duplicate_of relations and identical binaries (redaction variants stay distinct)."""
     parent = {r["record_id"]: r["record_id"] for r in records}
 
     def find(x):
@@ -47,7 +47,16 @@ def _clusters(records):
             parent[x] = parent[parent[x]]
             x = parent[x]
         return x
+    first_by_binary = {}
     for r in records:
+        # Identical preserved binaries (same SHA-256) found at different URLs or
+        # sources are one disclosure for analytical weighting.
+        if r.get("original_sha256"):
+            other = first_by_binary.setdefault(r["original_sha256"], r["record_id"])
+            if other != r["record_id"]:
+                a, b = find(r["record_id"]), find(other)
+                if a != b:
+                    parent[max(a, b)] = min(a, b)
         for rel in r["relations"]:
             if rel["kind"] == "duplicate_of" and rel["record_id"] in parent:
                 a, b = find(r["record_id"]), find(rel["record_id"])

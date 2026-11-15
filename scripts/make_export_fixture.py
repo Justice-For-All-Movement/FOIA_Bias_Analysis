@@ -1,8 +1,11 @@
-"""Regenerate the synthetic multi-source, multi-partition export fixture.
+"""Regenerate the synthetic FC-13 (foia-catalog-export/1) snapshot fixture.
 
-Deterministic: running it twice yields byte-identical files. All content is
-synthetic and labelled as such. Markers like ``[[signal ...]]`` drive the
-deterministic fake labeling provider in tests; they are not real findings.
+Output matches FOIA_Aggregator ``export_contract.write_snapshot`` byte layout:
+``records-NNNNN.jsonl`` (``json.dumps(sort_keys=True, ensure_ascii=False)``
+per line) and ``manifest.json`` (``indent=2, sort_keys=True``). Adds the
+Bias-side ``FIXTURE.json`` marker and ``bias-text-fixture.jsonl`` text sidecar
+(FC-13/1 exports no text). Deterministic; all content is synthetic. Markers
+like ``[[signal ...]]`` drive the deterministic fake labeling provider.
 
 Usage: python scripts/make_export_fixture.py [output_dir]
 """
@@ -13,113 +16,119 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from foia_bias.aggregator_contract import (CONTRACT_NAME, CONTRACT_VERSION,  # noqa: E402
-                                           FIXTURE_PRODUCER, validate_manifest, validate_record)
+from foia_bias.aggregator_contract import (CONTRACT_VERSION, FIXTURE_MARKER, TEXT_FIXTURE_SIDECAR,  # noqa: E402
+                                           normalize_url, record_id_for, validate_catalog_manifest,
+                                           validate_catalog_record)
 
 FILLER = "Synthetic routine administrative text with no partisan content. "
+OFFICIAL = "https://foia.agency.gov.example/{agency}/reading-room/"
+THIRD_PARTY = "https://releases.thirdparty.example/agency/{agency}/"
 
 
 def sha(text):
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def day(value):
-    return {"value": value, "precision": "day"}
+def source(url, provenance):
+    return {"source_id": "src_" + hashlib.sha256(normalize_url(url).encode()).hexdigest()[:16],
+            "url": normalize_url(url), "provenance": provenance}
 
 
-def release(record_id, family, agency, decision, text=None, status="extracted", archive="preserved",
-            original=None, relations=(), jurisdiction="us-federal", precision="day"):
-    content = text if status in ("extracted", "partial") else None
-    dates = {"decision_date": {"value": decision, "precision": precision if decision else "unknown"}}
+def doc_url(name):
+    return f"https://foia.agency.gov.example/docs/{name}.pdf"
+
+
+def record(name, agency, published, *, text=None, provenance=("official",), archived=True, binary=None,
+           extraction="indexed", char_count=None):
+    sources = [source((OFFICIAL if p == "official" else THIRD_PARTY).format(agency=agency.lower()), p)
+               for p in provenance]
+    indexed = archived and extraction in ("indexed", "indexed_truncated")
+    url = doc_url(name)
     return {
-        "record_id": record_id, "revision": 1, "record_type": "release", "source_family": family,
-        "jurisdiction": jurisdiction, "agency": agency, "component": None,
-        "provenance": [{"source_id": f"{family}:{record_id}", "source_url": None,
-                        "retrieved_at": "2026-11-01T00:00:00Z"}],
-        "original_sha256": original or sha("original:" + record_id), "dates": dates,
-        "archive_state": archive,
-        "text": {"status": status, "text_sha256": sha(content) if content is not None else None,
-                 "text_revision": 1 if content is not None else None,
-                 "extractor": "synthetic-extractor/1" if content is not None else None,
-                 "char_count": len(content) if content is not None else None, "content": content},
-        "relations": [{"kind": k, "record_id": r} for k, r in relations], "synthetic": True,
-    }
+        "record_id": record_id_for(url), "url": url, "title": f"SYNTHETIC {name}", "description": None,
+        "filename": f"{name}.pdf", "file_type": "pdf", "mime_type": "application/pdf",
+        "published_date": published, "published_year": int(published[:4]) if published else None,
+        "discovered_at": "2026-11-01T00:00:00+00:00",
+        "agency": {"slug": agency.lower(), "name": f"Synthetic {agency}"},
+        "office": {"slug": f"{agency.lower()}-foia", "name": f"Synthetic {agency} FOIA Office"},
+        "sources": sources,
+        "preservation": {"status": "archived" if archived else "metadata_only",
+                         "acquisition_status": "downloaded" if archived else "pending",
+                         "sha256": (binary or sha("binary:" + name)) if archived else None,
+                         "file_size": 1000 if archived else None,
+                         "archived_at": "2026-11-02T00:00:00+00:00" if archived else None},
+        "text": {"indexed": indexed, "extraction_status": extraction if archived else None,
+                 "extraction_method": "native_text" if indexed else None,
+                 "character_count": (char_count if char_count is not None else (len(text) if text else None))
+                 if indexed else None,
+                 "truncated": (extraction == "indexed_truncated") if indexed else None},
+    }, (text if indexed else None)
 
 
-def context(record_id, record_type, family, agency, dates, relations=()):
-    return {
-        "record_id": record_id, "revision": 1, "record_type": record_type, "source_family": family,
-        "jurisdiction": "us-federal", "agency": agency, "component": None,
-        "provenance": [{"source_id": f"{family}:{record_id}", "source_url": None, "retrieved_at": None}],
-        "original_sha256": sha("original:" + record_id), "dates": dates, "archive_state": "preserved",
-        "text": {"status": "not_applicable", "text_sha256": None, "text_revision": None, "extractor": None,
-                 "char_count": None, "content": None},
-        "relations": [{"kind": k, "record_id": r} for k, r in relations], "synthetic": True,
-    }
-
-
-def records():
+def scenarios():
     shared = "SYNTHETIC FIXTURE memo. [[signal party=R wrongdoing=0.8 favorability=-0.6]] " + FILLER * 3
     long_text = "SYNTHETIC FIXTURE long release. " + FILLER * 400 + \
         " [[signal party=D wrongdoing=0.9 favorability=-0.7]] Late decisive passage."
     assert long_text.index("[[signal") > 20000
     redacted = "SYNTHETIC FIXTURE briefing. [[signal party=D wrongdoing=0.1 favorability=0.5]] " + FILLER
     return [
-        release("agg:rr-001", "agency_reading_room", "DOJ", "2003-05-01", shared),
-        release("agg:mr-001", "muckrock", "DOJ", "2003-05-01", shared, original=sha("original:agg:rr-001"),
-                relations=[("duplicate_of", "agg:rr-001")]),
-        release("agg:oc-001", "other_release_collection", "DHS", "2014-08-12", long_text),
-        release("agg:rr-002", "agency_reading_room", "EPA", "2018-03-01", redacted),
-        release("agg:mr-002", "muckrock", "EPA", "2018-03-03", redacted.replace("briefing", "briefing [b6]"),
-                relations=[("redaction_variant_of", "agg:rr-002")]),
-        release("agg:rr-003", "agency_reading_room", "DOJ", None, "SYNTHETIC FIXTURE undated. " + FILLER),
-        release("agg:mr-003", "muckrock", "FBI", "2011-02-02", status="waiting", archive="remote_only"),
-        release("agg:rr-004", "agency_reading_room", "DOD", "2006-07-07", status="failed"),
-        release("agg:rr-005", "agency_reading_room", "DOD", "2007-07-07",
-                "SYNTHETIC FIXTURE partial OCR. " + FILLER, status="partial"),
-        context("agg:log-001", "request_log_row", "agency_log", "DOJ",
-                {"submitted_date": day("2020-12-01"), "closed_date": day("2021-02-15")},
-                relations=[("log_row_of_request", "agg:desc-001")]),
-        context("agg:annual-001", "annual_report", "foia_gov_annual", "DOJ",
-                {"period_start": day("2018-10-01"), "period_end": day("2019-09-30")}),
-        context("agg:desc-001", "request_description", "muckrock", "DOJ", {"submitted_date": day("2020-12-01")}),
-        release("agg:rr-006", "agency_reading_room", "State", "2021-01-20",
-                "SYNTHETIC FIXTURE inauguration-day release. [[signal party=R wrongdoing=0.2 favorability=0.1]]"),
-        release("agg:rr-007", "agency_reading_room", "State", "2025-03-15",
-                "SYNTHETIC FIXTURE ongoing-term release. " + FILLER),
-        release("agg:st-001", "other_release_collection", "California DOJ", "2010-06-01",
-                "SYNTHETIC FIXTURE state release. " + FILLER, jurisdiction="us-state-ca"),
+        record("rr-001", "DOJ", "2003-05-01", text=shared, binary=sha("shared-binary")),
+        record("mr-001", "DOJ", "2003-05-01", text=shared, binary=sha("shared-binary"), provenance=("third_party",)),
+        record("oc-001", "DHS", "2014-08-12", text=long_text, provenance=("official", "third_party")),
+        record("rr-002", "EPA", "2018-03-01", text=redacted),
+        record("mr-002", "EPA", "2018-03-03", text=redacted.replace("briefing", "briefing [b6]"),
+               provenance=("third_party",)),
+        record("rr-003", "DOJ", None, text="SYNTHETIC FIXTURE undated. " + FILLER),
+        record("mr-003", "FBI", "2011-02-02", archived=False, provenance=("third_party",)),
+        record("rr-004", "DOD", "2006-07-07", extraction="failed"),
+        record("rr-005", "DOD", "2007-07-07", text="SYNTHETIC FIXTURE partial OCR. " + FILLER,
+               extraction="indexed_truncated"),
+        record("rr-006", "State", "2021-01-20",
+               text="SYNTHETIC FIXTURE inauguration-day release. [[signal party=R wrongdoing=0.2 favorability=0.1]]"),
+        record("rr-007", "State", "2025-03-15", text="SYNTHETIC FIXTURE ongoing-term release. " + FILLER),
+        record("rr-008", "DOJ", "2012", text="SYNTHETIC FIXTURE year-only. [[signal party=D wrongdoing=0.6 favorability=0]]"),
+        record("rr-009", "DHS", "2016-05-05", char_count=120),  # indexed upstream, text not supplied
     ]
 
 
 def build(out_dir: Path):
     out_dir.mkdir(parents=True, exist_ok=True)
-    rows = records()
-    for row in rows:
-        validate_record(row, True)
-    partitions, families, types = [], {}, {}
+    rows = scenarios()
+    for row, _ in rows:
+        validate_catalog_record(row)
+    files = []
     for index in range(0, len(rows), 5):
-        chunk = rows[index:index + 5]
-        name = f"part-{index // 5 + 1:04d}.jsonl"
-        data = "".join(json.dumps(r, sort_keys=True, separators=(",", ":")) + "\n" for r in chunk)
-        (out_dir / name).write_bytes(data.encode("utf-8"))
-        partitions.append({"partition_id": f"p{index // 5 + 1:04d}", "path": name,
-                           "sha256": hashlib.sha256(data.encode("utf-8")).hexdigest(), "count": len(chunk)})
-        for r in chunk:
-            families[r["source_family"]] = families.get(r["source_family"], 0) + 1
-            types[r["record_type"]] = types.get(r["record_type"], 0) + 1
+        chunk = [r for r, _ in rows[index:index + 5]]
+        name = f"records-{index // 5 + 1:05d}.jsonl"
+        body = "".join(json.dumps(r, sort_keys=True, ensure_ascii=False) + "\n" for r in chunk)
+        (out_dir / name).write_text(body, encoding="utf-8")
+        files.append({"path": name, "records": len(chunk), "sha256": sha(body)})
+    records = [r for r, _ in rows]
     manifest = {
-        "contract": CONTRACT_NAME, "contract_version": CONTRACT_VERSION,
-        "snapshot_id": "synthetic-export-v1", "producer": {"name": FIXTURE_PRODUCER, "commit": "synthetic"},
-        "observed_at": "2026-11-15T00:00:00Z", "fixture_mode": True, "partitions": partitions,
-        "totals": {"records": len(rows)},
-        "coverage": {"source_families": dict(sorted(families.items())), "record_types": dict(sorted(types.items()))},
-        "unresolved_failures": [{"record_id": "agg:rr-004", "reason": "synthetic extraction failure"}],
+        "counts": {"records": len(records),
+                   "archived": sum(r["preservation"]["status"] == "archived" for r in records),
+                   "metadata_only": sum(r["preservation"]["status"] == "metadata_only" for r in records),
+                   "text_indexed": sum(r["text"]["indexed"] for r in records),
+                   "agencies": len({r["agency"]["slug"] for r in records}),
+                   "sources": len({s["source_id"] for r in records for s in r["sources"]})},
+        "excluded_fields": ["storage_key", "local_path", "storage_backend", "download_error", "requester_name"],
+        "files": files, "generated_at": "2026-11-15T00:00:00+00:00",
+        "license": "SYNTHETIC FIXTURE - not FOIA_Aggregator data.",
+        "pagination": {"default_page_size": 100, "max_page_size": 500,
+                       "order": "stable within a snapshot; cursors expire when the snapshot changes"},
+        "schema": "/api/v1/export/schema", "schema_version": CONTRACT_VERSION,
+        "snapshot_id": "snap_" + sha("synthetic-fc13-fixture-v1")[:20],
     }
-    validate_manifest(manifest)
-    (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
+    validate_catalog_manifest(manifest)
+    (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
+    (out_dir / FIXTURE_MARKER).write_text(json.dumps(
+        {"synthetic": True, "note": "Synthetic Bias fixture in FC-13 snapshot layout; not Aggregator data."},
+        sort_keys=True) + "\n", encoding="utf-8")
+    sidecar = "".join(json.dumps({"record_id": r["record_id"], "content": t}, sort_keys=True) + "\n"
+                      for r, t in rows if t is not None and r["text"]["indexed"])
+    (out_dir / TEXT_FIXTURE_SIDECAR).write_text(sidecar, encoding="utf-8")
     return manifest
 
 
 if __name__ == "__main__":
-    build(Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "fixtures" / "export_v1")
+    build(Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "fixtures" / "fc13_export_v1")

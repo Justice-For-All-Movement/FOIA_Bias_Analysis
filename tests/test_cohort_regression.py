@@ -8,7 +8,8 @@ from foia_bias.analysis.regression import (ModelSpec, analysis_report, exposure_
                                            fit, wrongdoing_spec)
 from foia_bias.llm.labeler import ChunkConfig, label_document
 from foia_bias.llm.provider import FakeProvider
-from tests.test_labeling import fixture_records, with_text
+from tests.fixture_helpers import fixture_records, rid
+from tests.test_labeling import with_text
 
 TERMS = [("clinton-1", "D", 1994), ("clinton-2", "D", 1998), ("bush-1", "R", 2002), ("bush-2", "R", 2006),
          ("obama-1", "D", 2010), ("obama-2", "D", 2014), ("trump-1", "R", 2018), ("biden-1", "D", 2022)]
@@ -48,19 +49,20 @@ class CohortTests(unittest.TestCase):
 
     def test_fixture_cohort_rows_and_exclusions(self):
         cohort = build_cohort(list(self.records.values()), self.labels)
-        self.assertEqual(cohort["input_records"], 15)
-        self.assertEqual(cohort["row_count"] + sum(cohort["exclusions"].values()), 15)
-        ids = [r["record_id"] for r in cohort["rows"]]
-        self.assertEqual(ids, ["agg:mr-001", "agg:mr-002", "agg:oc-001", "agg:rr-002"])
+        self.assertEqual(cohort["input_records"], 13)
+        self.assertEqual(cohort["row_count"] + sum(cohort["exclusions"].values()), 13)
+        dup_rep, dup_other = sorted([rid("rr-001"), rid("mr-001")])
+        self.assertEqual(sorted(r["record_id"] for r in cohort["rows"]),
+                         sorted([dup_rep, rid("mr-002"), rid("oc-001"), rid("rr-002")]))
         reasons = {e["record_id"]: e["reason"] for e in cohort["excluded"]}
-        self.assertEqual(reasons["agg:rr-001"], "duplicate_of:agg:mr-001")
-        self.assertEqual(reasons["agg:rr-003"], "unknown_date")
-        self.assertEqual(reasons["agg:rr-006"], "ambiguous_transition_day")
-        self.assertEqual(reasons["agg:rr-007"], "ongoing_incomplete_term")
-        self.assertEqual(reasons["agg:st-001"], "outside_jurisdiction:us-state-ca")
-        self.assertEqual(reasons["agg:rr-005"], "unlabeled:not_labeled")
-        self.assertEqual(reasons["agg:log-001"], "context_record:request_log_row")
-        oc = next(r for r in cohort["rows"] if r["record_id"] == "agg:oc-001")
+        self.assertEqual(reasons[dup_other], "duplicate_of:" + dup_rep)  # identical preserved binary
+        self.assertEqual(reasons[rid("rr-003")], "unknown_date")
+        self.assertEqual(reasons[rid("rr-006")], "ambiguous_transition_day")
+        self.assertEqual(reasons[rid("rr-007")], "ongoing_incomplete_term")
+        self.assertEqual(reasons[rid("rr-008")], "imprecise_date")
+        self.assertEqual(reasons[rid("rr-005")], "unlabeled:not_labeled")
+        self.assertEqual(reasons[rid("rr-009")], "unlabeled:not_labeled")
+        oc = next(r for r in cohort["rows"] if r["record_id"] == rid("oc-001"))
         self.assertEqual((oc["admin_party"], oc["party_target"], oc["same_party"], oc["wrongdoing_any"]),
                          ("D", "D", 1, 1))
 
@@ -76,26 +78,27 @@ class CohortTests(unittest.TestCase):
         base = build_cohort(list(self.records.values()), self.labels)
         strict = build_cohort(list(self.records.values()), self.labels, CohortConfig(wrongdoing_threshold=0.95))
         self.assertNotEqual(base["config_sha256"], strict["config_sha256"])
-        oc = lambda c: next(r for r in c["rows"] if r["record_id"] == "agg:oc-001")
+        oc = lambda c: next(r for r in c["rows"] if r["record_id"] == rid("oc-001"))
         self.assertEqual((oc(base)["wrongdoing_any"], oc(strict)["wrongdoing_any"]), (1, 0))
         all_docs = build_cohort(list(self.records.values()), self.labels, CohortConfig(duplicate_policy="all"))
         self.assertEqual(all_docs["row_count"], base["row_count"] + 1)
 
     def test_january_2025_completed_term_records_are_kept(self):
-        record = copy.deepcopy(self.records["agg:rr-002"])
-        record["record_id"] = "agg:jan-2025"
+        record = copy.deepcopy(self.records[rid("rr-002")])
+        record["record_id"] = "rec_jan2025"
         record["relations"] = []
-        record["dates"]["decision_date"]["value"] = "2025-01-10"
-        records = dict(self.records, **{"agg:jan-2025": record})
-        labels = dict(self.labels, **{"agg:jan-2025": self.labels["agg:rr-002"]})
+        record["dates"]["release_date"]["value"] = "2025-01-10"
+        record["original_sha256"] = "c" * 64  # a distinct disclosure, not a duplicate binary
+        records = dict(self.records, **{"rec_jan2025": record})
+        labels = dict(self.labels, **{"rec_jan2025": self.labels[rid("rr-002")]})
         row = next(r for r in build_cohort(list(records.values()), labels)["rows"]
-                   if r["record_id"] == "agg:jan-2025")
+                   if r["record_id"] == "rec_jan2025")
         self.assertEqual((row["term_id"], row["admin_party"], row["year"]), ("biden-1", "D", 2025))
 
     def test_ties_are_mixed_and_excluded_never_arbitrary(self):
         self.assertEqual(party_target([{"party": "D"}, {"party": "R"}]), "mixed")
         self.assertEqual(party_target([{"party": "unknown"}]), "none")
-        record = with_text(self.records["agg:rr-003"],
+        record = with_text(self.records[rid("rr-003")],
                            "SYN [[signal party=D wrongdoing=0.5 favorability=0]] [[signal party=R wrongdoing=0.5 "
                            "favorability=0]]")
         record["dates"]["decision_date"] = {"value": "2010-05-05", "precision": "day"}

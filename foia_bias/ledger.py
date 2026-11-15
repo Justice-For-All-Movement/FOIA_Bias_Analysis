@@ -153,19 +153,25 @@ class AnalysisLedger:
         self.conn.execute("COMMIT")
 
     # -- snapshots and records ---------------------------------------------
-    def register_snapshot(self, manifest: dict, manifest_sha256: str):
-        contract.validate_manifest(manifest)
+    def register_snapshot(self, info: dict):
+        """Register a snapshot from ``aggregator_contract.snapshot_info``. Immutable per ID."""
+        required = {"snapshot_id", "contract_version", "producer_name", "producer_commit", "manifest_sha256",
+                    "observed_at", "fixture_mode", "total_records"}
+        if not isinstance(info, dict) or set(info) != required:
+            raise LedgerError("snapshot info must come from aggregator_contract.snapshot_info")
+        if info["contract_version"] not in contract.SUPPORTED_CONTRACT_VERSIONS:
+            raise LedgerError("unsupported export contract version")
         with self.transaction() as conn:
             row = conn.execute("SELECT manifest_sha256 FROM snapshots WHERE snapshot_id=?",
-                               (manifest["snapshot_id"],)).fetchone()
+                               (info["snapshot_id"],)).fetchone()
             if row is not None:
-                if row[0] != manifest_sha256:
+                if row[0] != info["manifest_sha256"]:
                     raise LedgerError("snapshot_id reused with different manifest content")
                 return False
             conn.execute("INSERT INTO snapshots VALUES (?,?,?,?,?,?,?,?,?)", (
-                manifest["snapshot_id"], manifest["contract_version"], manifest["producer"]["name"],
-                manifest["producer"]["commit"], manifest_sha256, manifest["observed_at"],
-                int(manifest["fixture_mode"]), manifest["totals"]["records"], self.clock()))
+                info["snapshot_id"], info["contract_version"], info["producer_name"], info["producer_commit"],
+                info["manifest_sha256"], info["observed_at"], int(info["fixture_mode"]), info["total_records"],
+                self.clock()))
             return True
 
     def snapshot(self, snapshot_id):
