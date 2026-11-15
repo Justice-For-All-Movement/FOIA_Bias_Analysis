@@ -1,0 +1,16 @@
+{
+  "roster_version": "executive-1989-2025-v1",
+  "coverage": "executive_only",
+  "sources": [],
+  "actors": [
+    {"actor_id": "exec:clinton-b", "name": "Bill Clinton", "aliases": ["William J. Clinton", "President Clinton"], "roles": [{"role": "president", "party": "D", "start": "1993-01-20", "end": "2001-01-20"}]},
+    {"actor_id": "exec:gore-a", "name": "Al Gore", "aliases": ["Albert Gore Jr.", "Vice President Gore"], "roles": [{"role": "vice_president", "party": "D", "start": "1993-01-20", "end": "2001-01-20"}]},
+    {"actor_id": "exec:bush-gw", "name": "George W. Bush", "aliases": ["President Bush"], "roles": [{"role": "president", "party": "R", "start": "2001-01-20", "end": "2009-01-20"}]},
+    {"actor_id": "exec:cheney-d", "name": "Dick Cheney", "aliases": ["Richard B. Cheney", "Vice President Cheney"], "roles": [{"role": "vice_president", "party": "R", "start": "2001-01-20", "end": "2009-01-20"}]},
+    {"actor_id": "exec:obama-b", "name": "Barack Obama", "aliases": ["President Obama"], "roles": [{"role": "president", "party": "D", "start": "2009-01-20", "end": "2017-01-20"}]},
+    {"actor_id": "exec:biden-j", "name": "Joe Biden", "aliases": ["Joseph R. Biden Jr.", "President Biden", "Vice President Biden"], "roles": [{"role": "vice_president", "party": "D", "start": "2009-01-20", "end": "2017-01-20"}, {"role": "president", "party": "D", "start": "2021-01-20", "end": "2025-01-20"}]},
+    {"actor_id": "exec:trump-d", "name": "Donald Trump", "aliases": ["Donald J. Trump", "President Trump"], "roles": [{"role": "president", "party": "R", "start": "2017-01-20", "end": "2021-01-20"}, {"role": "president", "party": "R", "start": "2025-01-20", "end": null}]},
+    {"actor_id": "exec:pence-m", "name": "Mike Pence", "aliases": ["Michael R. Pence", "Vice President Pence"], "roles": [{"role": "vice_president", "party": "R", "start": "2017-01-20", "end": "2021-01-20"}]},
+    {"actor_id": "exec:harris-k", "name": "Kamala Harris", "aliases": ["Vice President Harris"], "roles": [{"role": "vice_president", "party": "D", "start": "2021-01-20", "end": "2025-01-20"}]}
+  ]
+}

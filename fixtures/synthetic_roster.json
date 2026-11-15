@@ -1,0 +1,9 @@
+{
+  "roster_version": "synthetic-party-switch-v1",
+  "coverage": "complete",
+  "sources": [{"name": "synthetic-fixture", "url": null, "retrieved_at": null}],
+  "actors": [
+    {"actor_id": "syn:switcher", "name": "Synthetic Switcher", "aliases": ["Senator Switcher"], "roles": [{"role": "senator", "party": "R", "start": "2003-01-03", "end": "2009-04-30"}, {"role": "senator", "party": "D", "start": "2009-04-30", "end": "2011-01-03"}]},
+    {"actor_id": "syn:dual", "name": "Synthetic Dual", "aliases": [], "roles": [{"role": "senator", "party": "I", "start": "2007-01-03", "end": "2013-01-03"}, {"role": "caucus", "party": "D", "start": "2007-01-03", "end": "2013-01-03"}]}
+  ]
+}
