@@ -8,9 +8,7 @@ from foia_bias.checkpoints import (CheckpointError, IncompatibleCheckpoint, Leas
                                    check_lease, compatibility_hash, get_cursor, open_cursor,
                                    reconcile_legacy_checkpoint, release_lease, verify_and_repair)
 from foia_bias.ledger import SCHEMA_VERSION, AnalysisLedger, LedgerError
-from tests.test_provenance_ledger import load_export
-
-SNAP = "synthetic-export-v1"
+from tests.fixture_helpers import SNAP, load_export
 
 
 class CheckpointTests(unittest.TestCase):
@@ -18,9 +16,9 @@ class CheckpointTests(unittest.TestCase):
         self.folder = tempfile.TemporaryDirectory()
         self.path = Path(self.folder.name) / "state" / "analysis.sqlite"
         self.ledger = AnalysisLedger(self.path, clock=lambda: "2026-11-15T00:00:00Z")
-        self.manifest, self.digest, self.rows = load_export()
-        self.ledger.register_snapshot(self.manifest, self.digest)
-        self.partitions = [(p["partition_id"], p["count"]) for p in self.manifest["partitions"]]
+        self.manifest, self.digest, info, self.rows = load_export()
+        self.ledger.register_snapshot(info)
+        self.partitions = [(f["path"], f["records"]) for f in self.manifest["files"]]
         self.compat = compatibility_hash(SNAP, self.digest, {"batch_size": 2})
 
     def tearDown(self):

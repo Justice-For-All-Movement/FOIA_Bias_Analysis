@@ -19,3 +19,6 @@ py-modules = ["main"]
 [tool.setuptools.packages.find]
 include = ["foia_bias*"]
 
+
+[tool.setuptools.package-data]
+foia_bias = ["schemas/*.json"]

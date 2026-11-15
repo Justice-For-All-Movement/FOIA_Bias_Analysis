@@ -1,15 +1,20 @@
-"""FBA-04 read-only, resumable consumer for partitioned Aggregator exports.
+"""FBA-04 read-only, resumable consumer for FC-13 catalog snapshots.
 
-Consumes a local export laid out per ``aggregator_contract`` (manifest plus
-JSONL partitions). It never fetches sources, never writes the export and never
-falls back to crawling. Memory is bounded by one record, one batch and the snapshot's record-ID set
-used for duplicate detection during verification.
+Consumes a snapshot written by FOIA_Aggregator ``python main.py export-catalog
+<dir>`` (``foia-catalog-export/1``: ``manifest.json`` + ``records-NNNNN.jsonl``),
+or the same records replayed from the paginated API (``aggregator_api``). It
+never fetches sources, never writes the export and never falls back to
+crawling.
 
-Every partition is first verified (SHA-256, count, every row validated, no
-duplicate IDs across the snapshot) before anything is ingested; then records
-from the durable cursor onward are ingested in batches; each batch commits records and cursor in one transaction.
-A batch cap pauses progress but never shrinks the census: the summary always
-reports the manifest's full total and how much remains.
+Every file is verified first (SHA-256, count, every record against the pinned
+JSON Schema and invariants, record-ID uniqueness, manifest archived/indexed/
+agency counts) before anything is ingested; then records from the durable
+cursor onward are ingested in batches that commit records and cursor in one
+transaction. A batch cap pauses progress but never shrinks the census.
+
+Fixture snapshots carry a ``FIXTURE.json`` marker and may carry a Bias-side
+``bias-text-fixture.jsonl`` text sidecar (FC-13/1 exports no text). A live
+snapshot with either file is rejected.
 """
 from __future__ import annotations
 
@@ -20,6 +25,8 @@ from foia_bias import aggregator_contract as contract
 from foia_bias.checkpoints import (acquire_lease, advance, check_lease, compatibility_hash, open_cursor,
                                    release_lease, verify_and_repair)
 from foia_bias.corpus import MAX_MANIFEST_BYTES, MAX_RECORD_BYTES, local_path, strict_json
+
+MAX_SIDECAR_BYTES = 512 * 1024 * 1024
 
 
 class ConsumerError(ValueError):
@@ -33,8 +40,35 @@ def load_manifest(export_dir, expected_fixture: bool):
         raw = stream.read(MAX_MANIFEST_BYTES + 1)
     if len(raw) > MAX_MANIFEST_BYTES:
         raise ConsumerError("manifest exceeds 1 MiB boundary")
-    manifest = contract.validate_manifest(strict_json(raw.decode("utf-8")), expected_fixture=expected_fixture)
-    return manifest, hashlib.sha256(raw).hexdigest()
+    manifest = contract.validate_catalog_manifest(strict_json(raw.decode("utf-8")))
+    marker = root / contract.FIXTURE_MARKER
+    fixture = marker.is_file()
+    if fixture:
+        data = strict_json(local_path(root, contract.FIXTURE_MARKER).read_text(encoding="utf-8"))
+        if data != {"synthetic": True, "note": data.get("note")} or not isinstance(data.get("note"), str):
+            raise ConsumerError("FIXTURE.json must be {\"synthetic\": true, \"note\": \"...\"}")
+    if fixture != expected_fixture:
+        raise contract.ContractError("fixture mode mismatch: fixture snapshots can never pass as live (or vice versa)")
+    return manifest, hashlib.sha256(raw).hexdigest(), fixture
+
+
+def load_text_sidecar(root, fixture):
+    sidecar = root / contract.TEXT_FIXTURE_SIDECAR
+    if not sidecar.exists():
+        return {}
+    if not fixture:
+        raise ConsumerError("text sidecars are fixture-only; FC-13/1 does not export text")
+    path = local_path(root, contract.TEXT_FIXTURE_SIDECAR)
+    if path.stat().st_size > MAX_SIDECAR_BYTES:
+        raise ConsumerError("text sidecar exceeds size bound")
+    texts = {}
+    for _, _, row in _iter_rows(path):
+        if not isinstance(row, dict) or set(row) != {"record_id", "content"} or not isinstance(row["content"], str):
+            raise ConsumerError("text sidecar rows must be {record_id, content}")
+        if row["record_id"] in texts:
+            raise ConsumerError("duplicate record_id in text sidecar")
+        texts[row["record_id"]] = row["content"]
+    return texts
 
 
 def _iter_rows(path):
@@ -47,27 +81,40 @@ def _iter_rows(path):
             if len(line) > MAX_RECORD_BYTES:
                 raise ConsumerError("record exceeds 16 MiB boundary")
             if not line.strip():
-                raise ConsumerError("blank line in partition")
+                raise ConsumerError("blank line in snapshot file")
             yield ordinal, line, strict_json(line.decode("utf-8"))
             ordinal += 1
 
 
-def verify_partition(root, partition, fixture, seen_ids):
-    path = local_path(root, partition["path"])
-    digest = hashlib.sha256()
-    count = 0
-    for _, line, row in _iter_rows(path):
-        digest.update(line)
-        contract.validate_record(row, fixture)
-        if row["record_id"] in seen_ids:
-            raise ConsumerError(f"duplicate record_id {row['record_id']} within snapshot")
-        seen_ids.add(row["record_id"])
-        count += 1
-    if digest.hexdigest() != partition["sha256"]:
-        raise ConsumerError(f"partition {partition['partition_id']} SHA-256 mismatch")
-    if count != partition["count"]:
-        raise ConsumerError(f"partition {partition['partition_id']} count mismatch (truncated or padded)")
-    return path
+def verify_files(root, manifest):
+    """Verify all files; return (paths, tallies). Raises before any ingest."""
+    seen, paths = set(), []
+    tallies = {"archived": 0, "text_indexed": 0, "agencies": set()}
+    for entry in manifest["files"]:
+        path = local_path(root, entry["path"])
+        digest, count = hashlib.sha256(), 0
+        for _, line, row in _iter_rows(path):
+            digest.update(line)
+            contract.validate_catalog_record(row)
+            if row["record_id"] in seen:
+                raise ConsumerError(f"duplicate record_id {row['record_id']} within snapshot")
+            seen.add(row["record_id"])
+            tallies["archived"] += row["preservation"]["status"] == "archived"
+            tallies["text_indexed"] += row["text"]["indexed"]
+            if row["agency"]:
+                tallies["agencies"].add(row["agency"]["slug"])
+            count += 1
+        if digest.hexdigest() != entry["sha256"]:
+            raise ConsumerError(f"{entry['path']} SHA-256 mismatch")
+        if count != entry["records"]:
+            raise ConsumerError(f"{entry['path']} record count mismatch (truncated or padded)")
+        paths.append(path)
+    counts = manifest["counts"]
+    if tallies["archived"] != counts["archived"] or tallies["text_indexed"] != counts["text_indexed"]:
+        raise ConsumerError("manifest archived/text_indexed counts disagree with records")
+    if len(tallies["agencies"]) != counts["agencies"]:
+        raise ConsumerError("manifest agency count disagrees with records")
+    return paths, seen
 
 
 def consume(ledger, export_dir, *, job_id="consume", batch_size=500, max_batches=None, expected_fixture=True,
@@ -79,36 +126,34 @@ def consume(ledger, export_dir, *, job_id="consume", batch_size=500, max_batches
     hooks = hooks or {}
     now = now or ledger.clock()
     root = Path(export_dir).resolve(strict=True)
-    manifest, manifest_sha = load_manifest(root, expected_fixture)
-    fixture = manifest["fixture_mode"]
+    manifest, manifest_sha, fixture = load_manifest(root, expected_fixture)
+    texts = load_text_sidecar(root, fixture)
+    paths, ids = verify_files(root, manifest)
+    if set(texts) - ids:
+        raise ConsumerError("text sidecar references records outside the snapshot")
     snapshot_id = manifest["snapshot_id"]
-    ledger.register_snapshot(manifest, manifest_sha)  # raises if the snapshot token changed
+    ledger.register_snapshot(contract.snapshot_info(manifest, manifest_sha, fixture))
     compat = compatibility_hash(snapshot_id, manifest_sha,
-                                {"contract_version": manifest["contract_version"], **(analysis_config or {})})
+                                {"contract_version": manifest["schema_version"],
+                                 "contract_commit": contract.AGGREGATOR_CONTRACT_COMMIT, **(analysis_config or {})})
     acquire_lease(ledger, job_id, owner, now)
     try:
         open_cursor(ledger, job_id, snapshot_id, compat)
-        partitions = manifest["partitions"]
-        cursor = verify_and_repair(ledger, job_id, [(p["partition_id"], p["count"]) for p in partitions])
-        batches = 0
-        seen_ids: set = set()
-        paused = False
-        # Verify the entire snapshot before acknowledging any of it, so an
-        # invalid export never yields a partial ingest.
-        paths = [verify_partition(root, partition, fixture, seen_ids) for partition in partitions]
-        seen_ids.clear()
-        for index, partition in enumerate(partitions):
-            path = paths[index]
+        files = manifest["files"]
+        cursor = verify_and_repair(ledger, job_id, [(f["path"], f["records"]) for f in files])
+        batches, paused = 0, False
+        for index, entry in enumerate(files):
             if index < cursor.partition_index:
                 continue
             start = cursor.record_offset if index == cursor.partition_index else 0
             batch = []
-            for ordinal, _, row in _iter_rows(path):
+            for ordinal, _, row in _iter_rows(paths[index]):
                 if ordinal < start:
                     continue
-                batch.append((ordinal, row))
+                batch.append((ordinal, contract.to_analysis_record(row, fixture=fixture,
+                                                                    text=texts.get(row["record_id"]))))
                 if len(batch) == batch_size:
-                    _commit(ledger, job_id, snapshot_id, partition, index, batch, owner, now, hooks, batches)
+                    _commit(ledger, job_id, snapshot_id, entry["path"], index, batch, owner, now, hooks, batches)
                     batches += 1
                     batch = []
                     if max_batches is not None and batches >= max_batches:
@@ -117,43 +162,43 @@ def consume(ledger, export_dir, *, job_id="consume", batch_size=500, max_batches
             if paused:
                 break
             if batch:
-                _commit(ledger, job_id, snapshot_id, partition, index, batch, owner, now, hooks, batches)
+                _commit(ledger, job_id, snapshot_id, entry["path"], index, batch, owner, now, hooks, batches)
                 batches += 1
             with ledger.transaction():
                 check_lease(ledger, job_id, owner, now)
                 advance(ledger, job_id, index + 1, 0, 0)
-            if max_batches is not None and batches >= max_batches and index + 1 < len(partitions):
+            if max_batches is not None and batches >= max_batches and index + 1 < len(files):
                 paused = True
                 break
         committed = ledger.record_count(snapshot_id)
-        total = manifest["totals"]["records"]
+        total = manifest["counts"]["records"]
         status = "paused_batch_cap" if paused and committed < total else "complete"
         if status == "complete":
             if committed != total:
                 raise ConsumerError("committed records do not match manifest census")
             census = ledger.census(snapshot_id)
-            for key, column in (("source_families", "source_family"), ("record_types", "record_type")):
-                if census[column] != {k: v for k, v in manifest["coverage"][key].items() if v}:
-                    raise ConsumerError(f"census disagrees with manifest coverage.{key}")
+            if census["archive_state"].get("preserved", 0) != manifest["counts"]["archived"]:
+                raise ConsumerError("ledger census disagrees with manifest archived count")
             with ledger.transaction():
-                advance(ledger, job_id, len(partitions), 0, 0, status="complete")
+                advance(ledger, job_id, len(files), 0, 0, status="complete")
         return {
             "status": status, "snapshot_id": snapshot_id, "manifest_sha256": manifest_sha,
-            "contract_version": manifest["contract_version"], "producer": manifest["producer"],
-            "fixture_mode": fixture, "records_total": total, "records_committed": committed,
-            "records_remaining": total - committed, "batches_this_run": batches,
-            "unresolved_failures": manifest["unresolved_failures"],
+            "contract_version": manifest["schema_version"],
+            "contract_commit": contract.AGGREGATOR_CONTRACT_COMMIT, "fixture_mode": fixture,
+            "records_total": total, "records_committed": committed, "records_remaining": total - committed,
+            "batches_this_run": batches, "text_supplied": len(texts),
+            "upstream_gaps": ["FC-13/1 exports no document text", "FC-13/1 exports no request-log/annual context"],
             "analysis_performed": False, "research_eligible": False,
         }
     finally:
         release_lease(ledger, job_id, owner)
 
 
-def _commit(ledger, job_id, snapshot_id, partition, index, batch, owner, now, hooks, batch_number):
+def _commit(ledger, job_id, snapshot_id, partition_id, index, batch, owner, now, hooks, batch_number):
     with ledger.transaction():
         check_lease(ledger, job_id, owner, now)
         for ordinal, row in batch:
-            if not ledger.ingest_record(snapshot_id, row, partition["partition_id"], ordinal):
+            if not ledger.ingest_record(snapshot_id, row, partition_id, ordinal):
                 raise ConsumerError(f"record {row['record_id']} already stored; cursor inconsistent")
         if "before_commit" in hooks:
             hooks["before_commit"](batch_number)
