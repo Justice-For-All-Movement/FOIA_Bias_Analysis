@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "repository": "neophilism/FOIA_Bias_Analysis",
-  "roadmapVersion": 3,
+  "repository": "Justice-For-All-Movement/FOIA_Bias_Analysis",
+  "roadmapVersion": 4,
   "planVerified": true,
   "plannedPrCount": 16,
   "observedAt": "2026-10-11T23:06:08.067Z",
@@ -16,17 +16,17 @@
     "planVerifiedMeaning": "Current enumerated plan and registry consistency only; not transcript fidelity, implementation acceptance, live operation or approval of historical claims",
     "priorEvidenceMeaning": "Historical PRs are preserved as related evidence; they are not completion mappings for newly scoped remediation acceptance",
     "upstreamPlan": {
-      "repository": "neophilism/FOIA_Aggregator",
+      "repository": "Justice-For-All-Movement/FOIA_Aggregator",
       "commit": "62fe82950963dcc0dde2003f094047d65bf79a9d",
       "path": "docs/DEVELOPMENT_PLAN.md",
       "requiredEvidence": "FC-13/FC-14 actual versioned corpus export and coverage review; completion not verified"
     },
     "corpusAuthority": {
-      "repository": "neophilism/FOIA_Aggregator",
+      "repository": "Justice-For-All-Movement/FOIA_Aggregator",
       "input": "versioned read-only full-corpus snapshot/export with complete extracted text",
       "sourcePolicy": "all archive source families subject to explicit date/jurisdiction/record-type cohort rules; MuckRock is one included source",
-      "collectionOwner": "neophilism/FOIA_Aggregator",
-      "analysisOwner": "neophilism/FOIA_Bias_Analysis",
+      "collectionOwner": "Justice-For-All-Movement/FOIA_Aggregator",
+      "analysisOwner": "Justice-For-All-Movement/FOIA_Bias_Analysis",
       "independentSourceCrawling": false,
       "periodPolicy": "compare completed equal-duration presidential terms; normalize pooled administrations; exclude incomplete ongoing second Trump term from this cohort",
       "archiveAfterCutoff": true
@@ -68,7 +68,12 @@
         8
       ],
       "planPath": "docs/DEVELOPMENT_PLAN.md",
-      "planSection": "FBA-01"
+      "planSection": "FBA-01",
+      "contributingPrs": [
+        1,
+        6,
+        7
+      ]
     },
     {
       "id": "FBA-02",
@@ -117,7 +122,14 @@
         21
       ],
       "planPath": "docs/DEVELOPMENT_PLAN.md",
-      "planSection": "FBA-03"
+      "planSection": "FBA-03",
+      "contributingPrs": [
+        16,
+        17,
+        19,
+        20,
+        21
+      ]
     },
     {
       "id": "FBA-04",
@@ -185,7 +197,11 @@
         8
       ],
       "planPath": "docs/DEVELOPMENT_PLAN.md",
-      "planSection": "FBA-06"
+      "planSection": "FBA-06",
+      "contributingPrs": [
+        2,
+        8
+      ]
     },
     {
       "id": "FBA-07",
@@ -238,7 +254,12 @@
         14
       ],
       "planPath": "docs/DEVELOPMENT_PLAN.md",
-      "planSection": "FBA-08"
+      "planSection": "FBA-08",
+      "contributingPrs": [
+        10,
+        11,
+        12
+      ]
     },
     {
       "id": "FBA-09",
@@ -461,7 +482,7 @@
       "id": 4822204636,
       "number": 22,
       "title": "docs: complete FOIA Bias Analysis plan and independent-account handoff",
-      "url": "https://github.com/neophilism/FOIA_Bias_Analysis/pull/22",
+      "url": "https://github.com/Justice-For-All-Movement/FOIA_Bias_Analysis/pull/22",
       "state": "closed",
       "draft": false,
       "createdAt": "2026-10-11T20:43:24.000Z",
@@ -476,7 +497,7 @@
       "id": 3028252901,
       "number": 21,
       "title": "Improve MuckRock pagination resume checkpoints",
-      "url": "https://github.com/neophilism/FOIA_Bias_Analysis/pull/21",
+      "url": "https://github.com/Justice-For-All-Movement/FOIA_Bias_Analysis/pull/21",
       "state": "closed",
       "draft": false,
       "createdAt": "2025-11-20T04:55:48.000Z",
@@ -491,7 +512,7 @@
       "id": 3027707834,
       "number": 20,
       "title": "Improve MuckRock pagination resume checkpoints",
-      "url": "https://github.com/neophilism/FOIA_Bias_Analysis/pull/20",
+      "url": "https://github.com/Justice-For-All-Movement/FOIA_Bias_Analysis/pull/20",
       "state": "closed",
       "draft": false,
       "createdAt": "2025-11-19T23:57:40.000Z",
@@ -506,7 +527,7 @@
       "id": 3027670670,
       "number": 19,
       "title": "Make MuckRock checkpoint resume unconditionally",
-      "url": "https://github.com/neophilism/FOIA_Bias_Analysis/pull/19",
+      "url": "https://github.com/Justice-For-All-Movement/FOIA_Bias_Analysis/pull/19",
       "state": "closed",
       "draft": false,
       "createdAt": "2025-11-19T23:32:29.000Z",
@@ -521,7 +542,7 @@
       "id": 3027670383,
       "number": 18,
       "title": "Make MuckRock checkpoint resume unconditionally",
-      "url": "https://github.com/neophilism/FOIA_Bias_Analysis/pull/18",
+      "url": "https://github.com/Justice-For-All-Movement/FOIA_Bias_Analysis/pull/18",
       "state": "closed",
       "draft": false,
       "createdAt": "2025-11-19T23:32:17.000Z",
@@ -536,7 +557,7 @@
       "id": 3027460476,
       "number": 17,
       "title": "Improve MuckRock checkpoint resume logic",
-      "url": "https://github.com/neophilism/FOIA_Bias_Analysis/pull/17",
+      "url": "https://github.com/Justice-For-All-Movement/FOIA_Bias_Analysis/pull/17",
       "state": "closed",
       "draft": false,
       "createdAt": "2025-11-19T21:52:04.000Z",
@@ -551,7 +572,7 @@
       "id": 3026669642,
       "number": 16,
       "title": "Add page-level checkpoints to MuckRock ingestion",
-      "url": "https://github.com/neophilism/FOIA_Bias_Analysis/pull/16",
+      "url": "https://github.com/Justice-For-All-Movement/FOIA_Bias_Analysis/pull/16",
       "state": "closed",
       "draft": false,
       "createdAt": "2025-11-19T17:04:01.000Z",
@@ -566,7 +587,7 @@
       "id": 3026457765,
       "number": 15,
       "title": "Deduplicate MuckRock file downloads",
-      "url": "https://github.com/neophilism/FOIA_Bias_Analysis/pull/15",
+      "url": "https://github.com/Justice-For-All-Movement/FOIA_Bias_Analysis/pull/15",
       "state": "closed",
       "draft": false,
       "createdAt": "2025-11-19T16:02:53.000Z",
@@ -581,7 +602,7 @@
       "id": 3026066597,
       "number": 14,
       "title": "Ensure MuckRock files download to disk",
-      "url": "https://github.com/neophilism/FOIA_Bias_Analysis/pull/14",
+      "url": "https://github.com/Justice-For-All-Movement/FOIA_Bias_Analysis/pull/14",
       "state": "closed",
       "draft": false,
       "createdAt": "2025-11-19T14:24:23.000Z",
@@ -596,7 +617,7 @@
       "id": 3025919593,
       "number": 13,
       "title": "Fix MuckRock ingestion to use files endpoint",
-      "url": "https://github.com/neophilism/FOIA_Bias_Analysis/pull/13",
+      "url": "https://github.com/Justice-For-All-Movement/FOIA_Bias_Analysis/pull/13",
       "state": "closed",
       "draft": false,
       "createdAt": "2025-11-19T13:45:30.000Z",
@@ -611,7 +632,7 @@
       "id": 3025805679,
       "number": 12,
       "title": "Fix GovTrack download and document fallbacks",
-      "url": "https://github.com/neophilism/FOIA_Bias_Analysis/pull/12",
+      "url": "https://github.com/Justice-For-All-Movement/FOIA_Bias_Analysis/pull/12",
       "state": "closed",
       "draft": false,
       "createdAt": "2025-11-19T13:12:27.000Z",
@@ -626,7 +647,7 @@
       "id": 3023372618,
       "number": 11,
       "title": "Fix MuckRock document retrieval and add executive actors",
-      "url": "https://github.com/neophilism/FOIA_Bias_Analysis/pull/11",
+      "url": "https://github.com/Justice-For-All-Movement/FOIA_Bias_Analysis/pull/11",
       "state": "closed",
       "draft": false,
       "createdAt": "2025-11-18T20:16:17.000Z",
@@ -641,7 +662,7 @@
       "id": 3023321547,
       "number": 10,
       "title": "Auto-load congressional actors from GovTrack",
-      "url": "https://github.com/neophilism/FOIA_Bias_Analysis/pull/10",
+      "url": "https://github.com/Justice-For-All-Movement/FOIA_Bias_Analysis/pull/10",
       "state": "closed",
       "draft": false,
       "createdAt": "2025-11-18T20:03:18.000Z",
@@ -656,7 +677,7 @@
       "id": 3023276374,
       "number": 9,
       "title": "Download released MuckRock documents",
-      "url": "https://github.com/neophilism/FOIA_Bias_Analysis/pull/9",
+      "url": "https://github.com/Justice-For-All-Movement/FOIA_Bias_Analysis/pull/9",
       "state": "closed",
       "draft": false,
       "createdAt": "2025-11-18T19:52:49.000Z",
@@ -671,7 +692,7 @@
       "id": 3023017778,
       "number": 8,
       "title": "Point agency logs at bundled fixtures",
-      "url": "https://github.com/neophilism/FOIA_Bias_Analysis/pull/8",
+      "url": "https://github.com/Justice-For-All-Movement/FOIA_Bias_Analysis/pull/8",
       "state": "closed",
       "draft": false,
       "createdAt": "2025-11-18T18:44:50.000Z",
@@ -686,7 +707,7 @@
       "id": 3022983515,
       "number": 7,
       "title": "Add verbose logging for ingestion progress",
-      "url": "https://github.com/neophilism/FOIA_Bias_Analysis/pull/7",
+      "url": "https://github.com/Justice-For-All-Movement/FOIA_Bias_Analysis/pull/7",
       "state": "closed",
       "draft": false,
       "createdAt": "2025-11-18T18:35:34.000Z",
@@ -701,7 +722,7 @@
       "id": 3022889387,
       "number": 6,
       "title": "Document pipeline with detailed inline comments",
-      "url": "https://github.com/neophilism/FOIA_Bias_Analysis/pull/6",
+      "url": "https://github.com/Justice-For-All-Movement/FOIA_Bias_Analysis/pull/6",
       "state": "closed",
       "draft": false,
       "createdAt": "2025-11-18T18:11:23.000Z",
@@ -716,7 +737,7 @@
       "id": 3022844274,
       "number": 5,
       "title": "Support tokenless MuckRock access and cap timeline at 2024",
-      "url": "https://github.com/neophilism/FOIA_Bias_Analysis/pull/5",
+      "url": "https://github.com/Justice-For-All-Movement/FOIA_Bias_Analysis/pull/5",
       "state": "closed",
       "draft": false,
       "createdAt": "2025-11-18T17:59:33.000Z",
@@ -731,7 +752,7 @@
       "id": 3022803882,
       "number": 4,
       "title": "Add troubleshooting note for MuckRock import error",
-      "url": "https://github.com/neophilism/FOIA_Bias_Analysis/pull/4",
+      "url": "https://github.com/Justice-For-All-Movement/FOIA_Bias_Analysis/pull/4",
       "state": "closed",
       "draft": false,
       "createdAt": "2025-11-18T17:47:54.000Z",
@@ -746,7 +767,7 @@
       "id": 3022720968,
       "number": 3,
       "title": "Support token or SDK auth for MuckRock",
-      "url": "https://github.com/neophilism/FOIA_Bias_Analysis/pull/3",
+      "url": "https://github.com/Justice-For-All-Movement/FOIA_Bias_Analysis/pull/3",
       "state": "closed",
       "draft": false,
       "createdAt": "2025-11-18T17:23:09.000Z",
@@ -761,7 +782,7 @@
       "id": 3022616634,
       "number": 2,
       "title": "Fix agency log parquet parsing",
-      "url": "https://github.com/neophilism/FOIA_Bias_Analysis/pull/2",
+      "url": "https://github.com/Justice-For-All-Movement/FOIA_Bias_Analysis/pull/2",
       "state": "closed",
       "draft": false,
       "createdAt": "2025-11-18T16:52:25.000Z",
@@ -776,7 +797,7 @@
       "id": 3022584595,
       "number": 1,
       "title": "Add FOIA bias analysis pipeline scaffolding",
-      "url": "https://github.com/neophilism/FOIA_Bias_Analysis/pull/1",
+      "url": "https://github.com/Justice-For-All-Movement/FOIA_Bias_Analysis/pull/1",
       "state": "closed",
       "draft": false,
       "createdAt": "2025-11-18T16:42:38.000Z",
@@ -787,5 +808,6 @@
       "baseRef": "main",
       "mergeCommitSha": "208ef4e48c5bd8226a269d742b02708150977379"
     }
-  ]
+  ],
+  "contributionEvidenceNote": "Historical MuckRock/data pipeline PRs contribute reusable parts to the newer full FOIA Aggregator corpus plan; they do not complete any of its sixteen current work units."
 }
