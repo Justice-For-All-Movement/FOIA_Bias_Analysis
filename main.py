@@ -35,9 +35,22 @@ def main(argv: list[str] | None = None) -> int:
     consume.add_argument("--job-id", default="consume")
     consume.add_argument("--live", action="store_true",
                          help="Expect a live FOIA_Aggregator export (default: synthetic fixture)")
+    gaps = commands.add_parser("text-gaps", help="Report text completeness and upstream repair items")
+    gaps.add_argument("--ledger", required=True)
+    gaps.add_argument("--snapshot", required=True)
     args = parser.parse_args(argv)
     if args.command == "consume":
         return _consume(args)
+    if args.command == "text-gaps":
+        try:
+            from foia_bias.ledger import AnalysisLedger
+            from foia_bias.text_completeness import gap_report
+            with AnalysisLedger(args.ledger) as ledger:
+                print(json.dumps(gap_report(ledger, args.snapshot), sort_keys=True))
+            return 0
+        except (OSError, ValueError, RuntimeError) as exc:
+            print(f"Text gap report failed: {exc}", file=sys.stderr)
+            return 2
     try:
         from foia_bias.utils.corpus_config import load_config
         config = load_config(Path(args.config))
