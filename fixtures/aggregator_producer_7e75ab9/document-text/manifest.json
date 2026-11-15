@@ -1,0 +1,29 @@
+{
+  "counts": {
+    "records": 1
+  },
+  "dataset": "document-text",
+  "excluded_fields": [
+    "storage_key",
+    "local_path",
+    "storage_backend",
+    "download_error"
+  ],
+  "files": [
+    {
+      "path": "document-text-00001.jsonl",
+      "records": 1,
+      "sha256": "fd163ce31ee7d4b7903ae5e61530cc59641b169dc92358858035add95e8c30d5"
+    }
+  ],
+  "generated_at": "2026-11-15T00:00:00+00:00",
+  "id_field": "record_id",
+  "producer": {
+    "commit": "7e75ab90ded8713fe47b59a92a4b3b87d2181c8c",
+    "commit_source": "FOIA_BUILD_COMMIT",
+    "name": "FOIA_Aggregator",
+    "repository": "Justice-For-All-Movement/FOIA_Aggregator"
+  },
+  "schema_version": "foia-document-text-export/1",
+  "snapshot_id": "tsnap_86f3b3c6799c76a14c12"
+}

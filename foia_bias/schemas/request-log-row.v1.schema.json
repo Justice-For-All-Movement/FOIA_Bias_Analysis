@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Justice-For-All-Movement/FOIA_Aggregator/schemas/request-log-row.v1.schema.json",
+  "title": "FOIA Aggregator request-log row (foia-request-log-export/1)",
+  "description": "One normalized row of an official FOIA request log (FC-03). A row is a request record, never a released document. Requester names, requester organizations and raw cells are never exported.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["row_id", "log", "sheet", "row_number", "tracking_number", "request_description", "received_date",
+               "closed_date", "disposition", "component", "exemptions", "released_record_reference",
+               "field_confidence", "warnings"],
+  "properties": {
+    "row_id": {"type": "string", "pattern": "^lrow_[0-9a-f]{24}$"},
+    "log": {
+      "type": "object", "additionalProperties": false, "required": ["log_id", "source_url", "sha256", "format", "agency"],
+      "properties": {
+        "log_id": {"type": "string", "pattern": "^log_[0-9a-f]{24}$"},
+        "source_url": {"type": "string"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$", "description": "SHA-256 of the raw log file."},
+        "format": {"type": "string", "enum": ["csv", "tsv", "xlsx"]},
+        "agency": {"type": ["string", "null"]}
+      }
+    },
+    "sheet": {"type": ["string", "null"]},
+    "row_number": {"type": "integer"},
+    "tracking_number": {"type": ["string", "null"]},
+    "request_description": {"type": ["string", "null"]},
+    "received_date": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+    "closed_date": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+    "disposition": {"type": ["string", "null"]},
+    "component": {"type": ["string", "null"]},
+    "exemptions": {"type": ["string", "null"]},
+    "released_record_reference": {"type": ["string", "null"], "description": "Pointer only; not proof of a matched archived binary."},
+    "field_confidence": {"type": "object", "description": "Canonical field -> mapping confidence (0..1)."},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  }
+}

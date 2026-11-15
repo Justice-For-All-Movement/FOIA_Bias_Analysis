@@ -1,33 +1,24 @@
-"""FOIA_Aggregator FC-13 export contract, consumer side (single source of truth).
+"""FOIA_Aggregator export contracts, consumer side (single source of truth).
 
 Pinned upstream
   repository  Justice-For-All-Movement/FOIA_Aggregator
-  commit      ca822fad6bc089a48ede6d89d94cdad47967b11f  (PR #72, FC-13)
-  contract    foia-catalog-export/1
-  schema      foia_bias/schemas/catalog-record.v1.schema.json (vendored verbatim,
-              SHA-256 pinned below; ``/api/v1/export/schema`` serves the same document)
-  snapshot    ``python main.py export-catalog <dir>`` -> manifest.json + records-NNNNN.jsonl
+  commit      7e75ab90ded8713fe47b59a92a4b3b87d2181c8c (main after PR #75 export
+              extensions; FC-13 record schema byte-identical since ca822fa, PR #72)
+  contracts   foia-catalog-export/1        (catalog records; contract_revision 1.1 manifests)
+              foia-document-text-export/1  (document text, joined by record_id)
+              foia-request-log-export/1    (FC-03 request-log rows)
+  schemas     foia_bias/schemas/*.schema.json, vendored verbatim, SHA-256 pinned below
+  snapshots   ``export-catalog <dir>``; ``export-dataset document-text|request-log-rows <dir>``
 
-This module has three layers:
+Manifests name the producer commit (``producer.commit``). Live exports with a
+null/unpinned producer commit are refused; fixtures are marked by FIXTURE.json.
 
-1. **FC-13 validation** of catalog manifests and records (schema subset
-   validator driven by the vendored JSON Schema plus documented invariants:
-   record_id derivation, preservation and text consistency).
-2. **Adapter** ``to_analysis_record`` mapping one FC-13 catalog record (plus
-   optional text) into Bias's internal *analysis record* (below).
-3. **Internal analysis record** validation used by the ledger, labeler and
-   cohorts. This internal shape is Bias's own and is *not* an upstream format.
+Layers: (1) FC-13 catalog validation; (2) extension dataset validation
+(document text, request-log rows); (3) ``to_analysis_record`` adapter into
+Bias's internal analysis record; (4) internal record validation.
 
-Known FC-13/1 gaps (upstream contract work, never a Bias crawler):
-* no full text is exported, only text-index status and character counts. A
-  live run therefore has every document ``waiting`` for upstream text. Fixture
-  runs may supply text through a Bias-side ``bias-text-fixture.jsonl`` sidecar.
-* no request-log rows, annual statistics or request descriptions (FC-03 rows
-  exist upstream but are not exported); see ``foia_bias.context``.
-* no jurisdiction field. FC-13/1 documents its records as U.S. federal
-  releases, so the adapter records ``us-federal`` as a contract-level assumption.
-* no producer deployment commit in the manifest; the consumer pins the
-  contract commit above and records the manifest SHA-256 and snapshot_id.
+Remaining FC-13 gaps: no jurisdiction field (``us-federal`` assumed per the
+federal-release note), no page offsets in text, no annual statistics export.
 """
 from __future__ import annotations
 
@@ -39,19 +30,27 @@ from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 
 AGGREGATOR_REPOSITORY = "Justice-For-All-Movement/FOIA_Aggregator"
-AGGREGATOR_CONTRACT_COMMIT = "ca822fad6bc089a48ede6d89d94cdad47967b11f"
+AGGREGATOR_CONTRACT_COMMIT = "7e75ab90ded8713fe47b59a92a4b3b87d2181c8c"
+CATALOG_SCHEMA_INTRODUCED = "ca822fad6bc089a48ede6d89d94cdad47967b11f"
 CONTRACT_VERSION = "foia-catalog-export/1"
+TEXT_VERSION = "foia-document-text-export/1"
+LOG_ROW_VERSION = "foia-request-log-export/1"
+EXTENSION_SCHEMAS = {
+    TEXT_VERSION: ("document-text.v1.schema.json", "777e048245a11b01ee43a5e00e912374e9dff694218bb8381a89feabbc4a1218",
+                   "document-text", "record_id"),
+    LOG_ROW_VERSION: ("request-log-row.v1.schema.json",
+                      "1e939ce1d023c0fa9aa06e98b62ec9d41086d0acb395f9aa7bb5b9b267c416ce", "request-log-rows", "row_id"),
+}
 SUPPORTED_CONTRACT_VERSIONS = (CONTRACT_VERSION,)
 SCHEMA_PATH = Path(__file__).resolve().parent / "schemas" / "catalog-record.v1.schema.json"
 SCHEMA_SHA256 = "1e8abc956b31db20d4855b2c73fb785696f6f0c28c437b91c1fc83c9bd039f34"
 LIVE_PRODUCER = "FOIA_Aggregator"
 FIXTURE_PRODUCER = "synthetic-fixture"
 FIXTURE_MARKER = "FIXTURE.json"
-TEXT_FIXTURE_SIDECAR = "bias-text-fixture.jsonl"
 ASSUMED_JURISDICTION = "us-federal"
 INDEXED_STATUSES = ("indexed", "indexed_truncated")
 MANIFEST_REQUIRED = {"schema_version", "snapshot_id", "generated_at", "counts", "excluded_fields", "files"}
-MANIFEST_OPTIONAL = {"schema", "pagination", "license"}
+MANIFEST_OPTIONAL = {"schema", "pagination", "license", "contract_revision", "producer"}
 COUNT_FIELDS = {"records", "archived", "metadata_only", "text_indexed", "agencies", "sources"}
 REQUIRED_EXCLUSIONS = {"requester_name", "storage_key", "local_path"}
 MAX_FILES = 100000
@@ -195,12 +194,80 @@ def validate_catalog_manifest(manifest: dict) -> dict:
     return manifest
 
 
+def producer_commit(manifest: dict, fixture: bool):
+    """The manifest's 40-hex producer commit; live exports without one are refused."""
+    producer = manifest.get("producer")
+    commit = producer.get("commit") if isinstance(producer, dict) else None
+    if isinstance(commit, str) and re.fullmatch(r"[0-9a-f]{40}", commit):
+        return commit
+    _require(fixture, "live export manifest does not name a pinned producer commit")
+    return "synthetic"
+
+
+def _extension_schema(version):
+    name, digest, _, _ = EXTENSION_SCHEMAS[version]
+    key = "ext:" + version
+    if key not in _SCHEMA_CACHE:
+        raw = (SCHEMA_PATH.parent / name).read_bytes()
+        _require(hashlib.sha256(raw).hexdigest() == digest, f"vendored {name} does not match the pinned SHA-256")
+        _SCHEMA_CACHE[key] = json.loads(raw.decode("utf-8"))
+    return _SCHEMA_CACHE[key]
+
+
+def validate_dataset_manifest(manifest: dict, version: str) -> dict:
+    _require(version in EXTENSION_SCHEMAS, "unknown extension dataset")
+    _, _, dataset, id_field = EXTENSION_SCHEMAS[version]
+    _require(isinstance(manifest, dict) and {"schema_version", "dataset", "snapshot_id", "generated_at", "producer",
+                                             "id_field", "counts", "files", "excluded_fields"} <= set(manifest),
+             "dataset manifest fields missing")
+    _require(manifest["schema_version"] == version and manifest["dataset"] == dataset
+             and manifest["id_field"] == id_field, "dataset manifest version/dataset mismatch")
+    _require(isinstance(manifest["snapshot_id"], str) and manifest["snapshot_id"], "snapshot_id required")
+    files, total, seen = manifest["files"], 0, set()
+    _require(isinstance(files, list), "files must be a list")
+    for entry in files:
+        _require(isinstance(entry, dict) and set(entry) == {"path", "records", "sha256"}
+                 and re.fullmatch(re.escape(dataset) + r"-\d{5}\.jsonl", str(entry["path"])) is not None
+                 and entry["path"] not in seen and _HEX64.fullmatch(str(entry["sha256"])) is not None
+                 and type(entry["records"]) is int and entry["records"] >= 0, "dataset file entry invalid")
+        seen.add(entry["path"])
+        total += entry["records"]
+    _require(manifest["counts"].get("records") == total, "dataset file counts do not sum to counts.records")
+    if version == LOG_ROW_VERSION:
+        _require({"requester_name", "requester_organization", "raw_cells"} <= set(manifest["excluded_fields"]),
+                 "request-log export must exclude personal fields and raw cells")
+    return manifest
+
+
+def validate_text_record(record: dict) -> dict:
+    schema_validate(record, _extension_schema(TEXT_VERSION))
+    _require(hashlib.sha256(record["text"].encode("utf-8")).hexdigest() == record["text_sha256"],
+             "text_sha256 does not match exported text")
+    if record["character_count"] is not None:
+        _require(record["character_count"] == len(record["text"]), "character_count does not match text")
+    _require(record["truncated"] or record["extraction"]["status"] != "indexed_truncated",
+             "truncated extraction must set truncated")
+    _require(record["record_id"] == record_id_for(record["url"]), "record_id does not derive from url")
+    return record
+
+
+def validate_log_row(row: dict) -> dict:
+    schema_validate(row, _extension_schema(LOG_ROW_VERSION))
+    for name in ("received_date", "closed_date"):
+        if row[name] is not None:
+            try:
+                datetime.strptime(row[name], "%Y-%m-%d")
+            except ValueError as exc:
+                raise ContractError(f"{name} is not a real date") from exc
+    return row
+
+
 def snapshot_info(manifest: dict, manifest_sha256: str, fixture: bool) -> dict:
     """Normalized snapshot identity stored in the analysis ledger."""
     validate_catalog_manifest(manifest)
     return {"snapshot_id": manifest["snapshot_id"], "contract_version": manifest["schema_version"],
             "producer_name": FIXTURE_PRODUCER if fixture else LIVE_PRODUCER,
-            "producer_commit": "synthetic" if fixture else AGGREGATOR_CONTRACT_COMMIT,
+            "producer_commit": producer_commit(manifest, fixture),
             "manifest_sha256": manifest_sha256, "observed_at": manifest["generated_at"],
             "fixture_mode": fixture, "total_records": manifest["counts"]["records"]}
 
@@ -229,7 +296,7 @@ def source_family(record: dict) -> str:
 
 
 def to_analysis_record(record: dict, *, fixture: bool, text: str | None = None) -> dict:
-    """Map a validated FC-13 catalog record into Bias's internal analysis record."""
+    """Map a validated FC-13 catalog record (plus its document-text export entry, if any)."""
     validate_catalog_record(record)
     pres, tinfo = record["preservation"], record["text"]
     archived = pres["status"] == "archived"

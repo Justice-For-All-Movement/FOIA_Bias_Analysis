@@ -1,10 +1,9 @@
 """Regenerate the synthetic FC-13 (foia-catalog-export/1) snapshot fixture.
 
-Output matches FOIA_Aggregator ``export_contract.write_snapshot`` byte layout:
-``records-NNNNN.jsonl`` (``json.dumps(sort_keys=True, ensure_ascii=False)``
-per line) and ``manifest.json`` (``indent=2, sort_keys=True``). Adds the
-Bias-side ``FIXTURE.json`` marker and ``bias-text-fixture.jsonl`` text sidecar
-(FC-13/1 exports no text). Deterministic; all content is synthetic. Markers
+Output matches FOIA_Aggregator 7e75ab9 snapshot byte layouts:
+``records-NNNNN.jsonl`` + ``manifest.json`` (catalog), plus
+``document-text/`` (foia-document-text-export/1) and ``request-log-rows/``
+(foia-request-log-export/1) dataset snapshots, each with a FIXTURE.json marker. Deterministic; all content is synthetic. Markers
 like ``[[signal ...]]`` drive the deterministic fake labeling provider.
 
 Usage: python scripts/make_export_fixture.py [output_dir]
@@ -16,9 +15,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from foia_bias.aggregator_contract import (CONTRACT_VERSION, FIXTURE_MARKER, TEXT_FIXTURE_SIDECAR,  # noqa: E402
+from foia_bias.aggregator_contract import (CONTRACT_VERSION, FIXTURE_MARKER, LOG_ROW_VERSION, TEXT_VERSION,  # noqa: E402
                                            normalize_url, record_id_for, validate_catalog_manifest,
-                                           validate_catalog_record)
+                                           validate_catalog_record, validate_dataset_manifest,
+                                           validate_log_row, validate_text_record)
 
 FILLER = "Synthetic routine administrative text with no partisan content. "
 OFFICIAL = "https://foia.agency.gov.example/{agency}/reading-room/"
@@ -124,10 +124,59 @@ def build(out_dir: Path):
     (out_dir / FIXTURE_MARKER).write_text(json.dumps(
         {"synthetic": True, "note": "Synthetic Bias fixture in FC-13 snapshot layout; not Aggregator data."},
         sort_keys=True) + "\n", encoding="utf-8")
-    sidecar = "".join(json.dumps({"record_id": r["record_id"], "content": t}, sort_keys=True) + "\n"
-                      for r, t in rows if t is not None and r["text"]["indexed"])
-    (out_dir / TEXT_FIXTURE_SIDECAR).write_text(sidecar, encoding="utf-8")
+    marker = json.dumps({"synthetic": True, "note": "Synthetic Bias fixture in FOIA_Aggregator snapshot layout; "
+                                                    "not Aggregator data."}, sort_keys=True) + "\n"
+    (out_dir / FIXTURE_MARKER).write_text(marker, encoding="utf-8")
+    texts = [{"record_id": r["record_id"], "url": r["url"], "text_sha256": sha(t), "text": t,
+              "character_count": len(t), "truncated": r["text"]["truncated"],
+              "extraction": {"status": r["text"]["extraction_status"], "method": r["text"]["extraction_method"]},
+              "source_document": {"preservation_status": "archived", "sha256": r["preservation"]["sha256"]}}
+             for r, t in rows if t is not None and r["text"]["indexed"]]
+    write_dataset(out_dir / "document-text", "document-text", TEXT_VERSION, "record_id", texts,
+                  ["storage_key", "local_path", "storage_backend", "download_error"], marker)
+    write_dataset(out_dir / "request-log-rows", "request-log-rows", LOG_ROW_VERSION, "row_id", log_rows(),
+                  ["requester_name", "requester_organization", "raw_cells"], marker)
     return manifest
+
+
+def write_dataset(out, dataset, version, id_field, records, excluded, marker):
+    out.mkdir(parents=True, exist_ok=True)
+    body = "".join(json.dumps(r, sort_keys=True, ensure_ascii=False) + "\n" for r in records)
+    name = f"{dataset}-00001.jsonl"
+    (out / name).write_text(body, encoding="utf-8")
+    manifest = {"schema_version": version, "dataset": dataset, "snapshot_id": "synthetic_" + sha(body)[:20],
+                "generated_at": "2026-11-15T00:00:00+00:00",
+                "producer": {"name": "synthetic-fixture", "repository": None, "commit": None, "commit_source": None},
+                "id_field": id_field, "counts": {"records": len(records)},
+                "files": [{"path": name, "records": len(records), "sha256": sha(body)}], "excluded_fields": excluded}
+    validate_dataset_manifest(manifest, version)
+    for record in records:
+        (validate_text_record if version == TEXT_VERSION else validate_log_row)(record)
+    (out / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
+    (out / FIXTURE_MARKER).write_text(marker, encoding="utf-8")
+
+
+def log_rows():
+    raw = sha("synthetic log file fy2018")
+    log = {"log_id": "log_" + sha("log-001")[:24], "source_url": "https://foia.agency.gov.example/doj/logs/fy2018.csv",
+           "sha256": raw, "format": "csv", "agency": "DOJ"}
+
+    def row(n, **kw):
+        out = {"row_id": "lrow_" + sha(f"row-{n}")[:24], "log": log, "sheet": None, "row_number": n,
+               "tracking_number": f"DOJ-2018-{n:04d}", "request_description": "SYNTHETIC request description",
+               "received_date": "2018-01-05", "closed_date": "2018-03-01", "disposition": "Full Grant",
+               "component": "doj-foia", "exemptions": None, "released_record_reference": None,
+               "field_confidence": {"tracking_number": 1.0, "received_date": 1.0}, "warnings": []}
+        out.update(kw)
+        return out
+    return [
+        row(1, released_record_reference=doc_url("rr-002")),
+        row(2, released_record_reference=record_id_for(doc_url("oc-001")), received_date="2014-06-01",
+            closed_date="2014-08-12"),
+        row(3, released_record_reference="https://foia.agency.gov.example/docs/not-in-snapshot.pdf"),
+        row(4, disposition=None, closed_date=None),
+        row(5, received_date="2021-01-10", closed_date="2021-01-05", warnings=["closed_before_received"]),
+    ]
 
 
 if __name__ == "__main__":

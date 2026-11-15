@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Justice-For-All-Movement/FOIA_Aggregator/schemas/document-text.v1.schema.json",
+  "title": "FOIA Aggregator document text record (foia-document-text-export/1)",
+  "description": "Extracted text of one released document. Parallel to foia-catalog-export/1 and joined to it by record_id. Only indexed text is exported; internal storage locations and download errors never are.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["record_id", "url", "text_sha256", "text", "character_count", "truncated", "extraction", "source_document"],
+  "properties": {
+    "record_id": {"type": "string", "pattern": "^rec_[0-9a-f]{24}$", "description": "Same stable ID as the FC-13 catalog record."},
+    "url": {"type": "string"},
+    "text_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$", "description": "SHA-256 of the UTF-8 text as exported."},
+    "text": {"type": "string"},
+    "character_count": {"type": ["integer", "null"]},
+    "truncated": {"type": "boolean", "description": "True when extraction stopped at the configured character limit."},
+    "extraction": {
+      "type": "object", "additionalProperties": false, "required": ["status", "method"],
+      "properties": {
+        "status": {"type": "string", "enum": ["indexed", "indexed_truncated"]},
+        "method": {"type": ["string", "null"], "description": "e.g. native_text, ocr, legacy_office."}
+      }
+    },
+    "source_document": {
+      "type": "object", "additionalProperties": false, "required": ["preservation_status", "sha256"],
+      "properties": {
+        "preservation_status": {"type": "string", "enum": ["archived", "metadata_only"]},
+        "sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$", "description": "Hash of the archived binary the text came from."}
+      }
+    }
+  }
+}

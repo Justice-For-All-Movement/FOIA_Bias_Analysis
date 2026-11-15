@@ -1,0 +1,28 @@
+{
+  "counts": {
+    "records": 5
+  },
+  "dataset": "request-log-rows",
+  "excluded_fields": [
+    "requester_name",
+    "requester_organization",
+    "raw_cells"
+  ],
+  "files": [
+    {
+      "path": "request-log-rows-00001.jsonl",
+      "records": 5,
+      "sha256": "9bdb366809d0513677c420d6968051b27f96865ba7b21fb8a65f7cce1bf023f7"
+    }
+  ],
+  "generated_at": "2026-11-15T00:00:00+00:00",
+  "id_field": "row_id",
+  "producer": {
+    "commit": null,
+    "commit_source": null,
+    "name": "synthetic-fixture",
+    "repository": null
+  },
+  "schema_version": "foia-request-log-export/1",
+  "snapshot_id": "synthetic_9bdb366809d0513677c4"
+}

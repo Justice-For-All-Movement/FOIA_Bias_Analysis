@@ -7,7 +7,10 @@ from foia_bias import aggregator_contract as contract
 
 ROOT = Path(__file__).resolve().parents[1]
 EXPORT = ROOT / "fixtures" / "fc13_export_v1"
-PRODUCER = ROOT / "fixtures" / "fc13_producer_snapshot"
+TEXT_EXPORT = EXPORT / "document-text"
+LOG_ROWS = EXPORT / "request-log-rows"
+PRODUCER_ROOT = ROOT / "fixtures" / "aggregator_producer_7e75ab9"
+PRODUCER = PRODUCER_ROOT / "catalog"
 SNAP = json.loads((EXPORT / "manifest.json").read_text())["snapshot_id"]
 
 
@@ -15,11 +18,12 @@ def rid(name):
     return contract.record_id_for(f"https://foia.agency.gov.example/docs/{name}.pdf")
 
 
-def texts(directory=EXPORT):
-    path = directory / contract.TEXT_FIXTURE_SIDECAR
-    if not path.exists():
+def texts(directory=TEXT_EXPORT):
+    if not (directory / "manifest.json").exists():
         return {}
-    return {row["record_id"]: row["content"] for row in map(json.loads, path.read_text().splitlines())}
+    manifest = json.loads((directory / "manifest.json").read_text())
+    return {row["record_id"]: row["text"] for entry in manifest["files"]
+            for row in map(json.loads, (directory / entry["path"]).read_text().splitlines())}
 
 
 def load_export(directory=EXPORT):
@@ -27,7 +31,7 @@ def load_export(directory=EXPORT):
     raw = (directory / "manifest.json").read_bytes()
     manifest = json.loads(raw)
     digest = hashlib.sha256(raw).hexdigest()
-    sidecar = texts(directory)
+    sidecar = texts(directory / "document-text")
     rows = []
     for entry in manifest["files"]:
         for ordinal, line in enumerate((directory / entry["path"]).read_text().splitlines()):

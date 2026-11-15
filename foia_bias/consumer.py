@@ -12,9 +12,10 @@ agency counts) before anything is ingested; then records from the durable
 cursor onward are ingested in batches that commit records and cursor in one
 transaction. A batch cap pauses progress but never shrinks the census.
 
-Fixture snapshots carry a ``FIXTURE.json`` marker and may carry a Bias-side
-``bias-text-fixture.jsonl`` text sidecar (FC-13/1 exports no text). A live
-snapshot with either file is rejected.
+Fixture snapshots carry a ``FIXTURE.json`` marker; a live snapshot with one is
+rejected. Document text comes from the separate ``foia-document-text-export/1``
+snapshot (``text_export``); each text entry must belong to a catalog record with
+the same URL and the same archived-binary SHA-256, or the run fails.
 """
 from __future__ import annotations
 
@@ -26,7 +27,6 @@ from foia_bias.checkpoints import (acquire_lease, advance, check_lease, compatib
                                    release_lease, verify_and_repair)
 from foia_bias.corpus import MAX_MANIFEST_BYTES, MAX_RECORD_BYTES, local_path, strict_json
 
-MAX_SIDECAR_BYTES = 512 * 1024 * 1024
 
 
 class ConsumerError(ValueError):
@@ -52,25 +52,6 @@ def load_manifest(export_dir, expected_fixture: bool):
     return manifest, hashlib.sha256(raw).hexdigest(), fixture
 
 
-def load_text_sidecar(root, fixture):
-    sidecar = root / contract.TEXT_FIXTURE_SIDECAR
-    if not sidecar.exists():
-        return {}
-    if not fixture:
-        raise ConsumerError("text sidecars are fixture-only; FC-13/1 does not export text")
-    path = local_path(root, contract.TEXT_FIXTURE_SIDECAR)
-    if path.stat().st_size > MAX_SIDECAR_BYTES:
-        raise ConsumerError("text sidecar exceeds size bound")
-    texts = {}
-    for _, _, row in _iter_rows(path):
-        if not isinstance(row, dict) or set(row) != {"record_id", "content"} or not isinstance(row["content"], str):
-            raise ConsumerError("text sidecar rows must be {record_id, content}")
-        if row["record_id"] in texts:
-            raise ConsumerError("duplicate record_id in text sidecar")
-        texts[row["record_id"]] = row["content"]
-    return texts
-
-
 def _iter_rows(path):
     with path.open("rb") as stream:
         ordinal = 0
@@ -88,7 +69,7 @@ def _iter_rows(path):
 
 def verify_files(root, manifest):
     """Verify all files; return (paths, tallies). Raises before any ingest."""
-    seen, paths = set(), []
+    seen, paths, catalog = set(), [], {}
     tallies = {"archived": 0, "text_indexed": 0, "agencies": set()}
     for entry in manifest["files"]:
         path = local_path(root, entry["path"])
@@ -99,6 +80,7 @@ def verify_files(root, manifest):
             if row["record_id"] in seen:
                 raise ConsumerError(f"duplicate record_id {row['record_id']} within snapshot")
             seen.add(row["record_id"])
+            catalog[row["record_id"]] = (row["url"], row["preservation"]["sha256"], row["text"]["indexed"])
             tallies["archived"] += row["preservation"]["status"] == "archived"
             tallies["text_indexed"] += row["text"]["indexed"]
             if row["agency"]:
@@ -114,11 +96,11 @@ def verify_files(root, manifest):
         raise ConsumerError("manifest archived/text_indexed counts disagree with records")
     if len(tallies["agencies"]) != counts["agencies"]:
         raise ConsumerError("manifest agency count disagrees with records")
-    return paths, seen
+    return paths, catalog
 
 
 def consume(ledger, export_dir, *, job_id="consume", batch_size=500, max_batches=None, expected_fixture=True,
-            analysis_config=None, owner="consumer", now=None, hooks=None):
+            analysis_config=None, owner="consumer", now=None, hooks=None, text_export=None):
     if type(batch_size) is not int or not 1 <= batch_size <= 10000:
         raise ConsumerError("batch_size must be 1..10000")
     if max_batches is not None and (type(max_batches) is not int or max_batches < 1):
@@ -127,15 +109,26 @@ def consume(ledger, export_dir, *, job_id="consume", batch_size=500, max_batches
     now = now or ledger.clock()
     root = Path(export_dir).resolve(strict=True)
     manifest, manifest_sha, fixture = load_manifest(root, expected_fixture)
-    texts = load_text_sidecar(root, fixture)
-    paths, ids = verify_files(root, manifest)
-    if set(texts) - ids:
-        raise ConsumerError("text sidecar references records outside the snapshot")
+    paths, catalog = verify_files(root, manifest)
+    texts, text_info = {}, None
+    if text_export is not None:
+        from foia_bias.extensions import load_text_export
+        loaded = load_text_export(text_export, expected_fixture=fixture)
+        for record_id, entry in loaded["texts"].items():
+            known = catalog.get(record_id)
+            if known is None or known[0] != entry["url"] or not known[2] \
+                    or entry["source_document"]["sha256"] != known[1]:
+                raise ConsumerError(f"text for {record_id} does not associate with a matching catalog record")
+            texts[record_id] = entry["text"]
+        text_info = {"snapshot_id": loaded["manifest"]["snapshot_id"], "manifest_sha256": loaded["manifest_sha256"],
+                     "producer_commit": loaded["producer_commit"], "records": len(texts)}
     snapshot_id = manifest["snapshot_id"]
     ledger.register_snapshot(contract.snapshot_info(manifest, manifest_sha, fixture))
     compat = compatibility_hash(snapshot_id, manifest_sha,
                                 {"contract_version": manifest["schema_version"],
-                                 "contract_commit": contract.AGGREGATOR_CONTRACT_COMMIT, **(analysis_config or {})})
+                                 "contract_commit": contract.AGGREGATOR_CONTRACT_COMMIT,
+                                 "text_export": text_info["manifest_sha256"] if text_info else None,
+                                 **(analysis_config or {})})
     acquire_lease(ledger, job_id, owner, now)
     try:
         open_cursor(ledger, job_id, snapshot_id, compat)
@@ -186,8 +179,8 @@ def consume(ledger, export_dir, *, job_id="consume", batch_size=500, max_batches
             "contract_version": manifest["schema_version"],
             "contract_commit": contract.AGGREGATOR_CONTRACT_COMMIT, "fixture_mode": fixture,
             "records_total": total, "records_committed": committed, "records_remaining": total - committed,
-            "batches_this_run": batches, "text_supplied": len(texts),
-            "upstream_gaps": ["FC-13/1 exports no document text", "FC-13/1 exports no request-log/annual context"],
+            "batches_this_run": batches, "text_supplied": len(texts), "text_export": text_info,
+            "producer_commit": contract.producer_commit(manifest, fixture),
             "analysis_performed": False, "research_eligible": False,
         }
     finally:

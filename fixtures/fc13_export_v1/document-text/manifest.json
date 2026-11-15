@@ -1,0 +1,29 @@
+{
+  "counts": {
+    "records": 10
+  },
+  "dataset": "document-text",
+  "excluded_fields": [
+    "storage_key",
+    "local_path",
+    "storage_backend",
+    "download_error"
+  ],
+  "files": [
+    {
+      "path": "document-text-00001.jsonl",
+      "records": 10,
+      "sha256": "c838974fd8af55e8b8fceabf86ad6c72655325d32e8f9571224d33cce1aa0ca8"
+    }
+  ],
+  "generated_at": "2026-11-15T00:00:00+00:00",
+  "id_field": "record_id",
+  "producer": {
+    "commit": null,
+    "commit_source": null,
+    "name": "synthetic-fixture",
+    "repository": null
+  },
+  "schema_version": "foia-document-text-export/1",
+  "snapshot_id": "synthetic_c838974fd8af55e8b8fc"
+}

@@ -33,6 +33,7 @@ def main(argv: list[str] | None = None) -> int:
     consume.add_argument("--batch-size", type=int, default=500)
     consume.add_argument("--max-batches", type=int, default=None)
     consume.add_argument("--job-id", default="consume")
+    consume.add_argument("--text-export", help="foia-document-text-export/1 snapshot directory")
     consume.add_argument("--live", action="store_true",
                          help="Expect a live FOIA_Aggregator export (default: synthetic fixture)")
     gaps = commands.add_parser("text-gaps", help="Report text completeness and upstream repair items")
@@ -88,7 +89,8 @@ def _consume(args) -> int:
         from foia_bias.ledger import AnalysisLedger
         with AnalysisLedger(args.ledger) as ledger:
             summary = consume(ledger, args.export, job_id=args.job_id, batch_size=args.batch_size,
-                              max_batches=args.max_batches, expected_fixture=not args.live)
+                              max_batches=args.max_batches, expected_fixture=not args.live,
+                              text_export=args.text_export)
     except (OSError, ValueError, RuntimeError) as exc:
         print(f"Export consumption failed: {exc}", file=sys.stderr)
         return 2
